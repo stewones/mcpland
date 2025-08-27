@@ -1,0 +1,83 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+	CallToolRequest,
+	CallToolRequestSchema,
+	ListToolsRequestSchema,
+	ServerResult,
+} from '@modelcontextprotocol/sdk/types.js';
+
+import type { McpServerConfig, McpToolDefinition } from '../core/mcp';
+
+export function createMcpServer(
+	config: McpServerConfig,
+	tools: McpToolDefinition[]
+) {
+	const server = new Server(
+		{
+			name: config.name,
+			version: config.version ?? '0.1.0',
+			description: config.description ?? `${config.name} MCP server`,
+		},
+		{ capabilities: { tools: {} } }
+	);
+	const allTools = tools.map(({ name, description, inputSchema }) => ({
+		name,
+		description,
+		inputSchema,
+	}));
+
+	server.setRequestHandler(ListToolsRequestSchema, async () => ({
+		tools: allTools,
+	}));
+
+	server.setRequestHandler(
+		CallToolRequestSchema,
+		async (request: CallToolRequest): Promise<ServerResult> => {
+			const { name, arguments: args } = request.params as {
+				name: string;
+				arguments: unknown;
+			};
+
+			const tool = tools.find((t) => t.name === name);
+
+			if (!tool) {
+				return {
+					content: [
+						{
+							type: 'text',
+							text: JSON.stringify({ error: `Unknown tool: ${name}` }),
+						},
+					],
+				};
+			}
+			try {
+				return await tool.handler(args);
+			} catch (err) {
+				return {
+					content: [
+						{
+							type: 'text',
+							text: JSON.stringify({
+								error: 'Tool execution failed',
+								details: err instanceof Error ? err.message : String(err),
+							}),
+						},
+					],
+				};
+			}
+		}
+	);
+
+	return server;
+}
+
+export async function startMcpServer(
+	config: McpServerConfig,
+	tools: McpToolDefinition[]
+) {
+	const server = createMcpServer(config, tools);
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
+	return server;
+}

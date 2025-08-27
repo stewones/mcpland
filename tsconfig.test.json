@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "bun", "node"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+		"paths": {
+			"mcpland": ["./src/index.ts"],
+			"mcpland/core": ["./src/core/index.ts"],
+			"mcpland/lib": ["./src/lib/index.ts"]
+		}
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

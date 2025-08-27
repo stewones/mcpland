@@ -1,0 +1,14 @@
+{
+	"formatExports": true,
+	"autoFormat": "onSave",
+	"wrappingStyle": "prettier",
+	"exclude": ["node_modules"],
+	"keepUnused": [],
+	"groupRules": [
+		{},
+		"^node:",
+		"^mcpland",
+		"^[@]",
+		"^[.]"
+	]
+}

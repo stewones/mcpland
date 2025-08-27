@@ -1,0 +1,29 @@
+{
+	"compilerOptions": {
+		"target": "ES2020",
+		"useDefineForClassFields": true,
+		"lib": ["ES2020", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"skipLibCheck": true,
+		"moduleResolution": "bundler",
+		"isolatedModules": true,
+		"baseUrl": ".",
+		"rootDir": ".",
+		"declaration": true,
+		"declarationMap": true,
+		"outDir": "dist/types",
+		"emitDeclarationOnly": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true,
+		"types": ["bun", "node"],
+		"paths": {
+			"mcpland": ["./src/index.ts"],
+			"mcpland/core": ["./src/core/index.ts"],
+			"mcpland/lib": ["./src/lib/index.ts"]
+		}
+	},
+	"include": ["src/**/*.ts", "src/**/*.d.ts"],
+	"exclude": ["node_modules", "dist", "test"]
+}

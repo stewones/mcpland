@@ -1,0 +1,55 @@
+{
+  "name": "mcpland",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Reusable Model Context Protocol (MCP) utilities and tools",
+  "scripts": {
+    "dev": "bun build src/index.ts --outdir ./dist --target bun --watch",
+    "build": "bun run format && bun run ./scripts/build.ts",
+    "build:prod": "bun run format && bun run ./scripts/build.ts --minify",
+    "prepublishOnly": "bun run build:prod",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage && open coverage/index.html",
+    "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/types/src/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./lib": {
+      "types": "./dist/types/src/lib/index.d.ts",
+      "default": "./dist/lib/index.js"
+    }
+  },
+  "files": [
+    "dist/index.js",
+    "dist/core",
+    "dist/tools",
+    "dist/types"
+  ],
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.5",
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "ai": "^5.0.8",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.21",
+    "@types/node": "^24.3.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "format-imports": "^4.0.8",
+    "typescript": "^5.9.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  }
+}
