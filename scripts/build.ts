@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import dedent from 'dedent';
 
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -44,9 +45,7 @@ async function bundle(): Promise<void> {
 
 	const result = await Bun.build({
 		entrypoints: [
-			path.join(rootDir, 'src/index.ts'),
 			path.join(rootDir, 'src/core/index.ts'),
-			path.join(rootDir, 'src/tools/index.ts'),
 			path.join(rootDir, 'src/lib/index.ts'),
 		],
 		outdir: distDir,
@@ -55,6 +54,15 @@ async function bundle(): Promise<void> {
 		sourcemap: 'external',
 		external: externals,
 		format: 'esm',
+		banner: dedent`
+			/**
+			 * @license
+			 * Copyright Intenseloop LTDA All Rights Reserved.
+			 *
+			 * Use of this source code is governed by an MIT-style license that can be
+			 * found in the LICENSE file at https://github.com/stewones/mcpland/blob/main/LICENSE
+			 */
+		`
 	});
 
 	for (const logMsg of result.logs) {
@@ -81,12 +89,33 @@ async function bundle(): Promise<void> {
 	log('bundle', `Wrote ${result.outputs.length} file(s) to ${distDir}`);
 }
 
+async function copyStaticFiles(): Promise<void> {
+	log('copy', 'Copying static files to dist');
+	
+	const filesToCopy = ['README.md', 'LICENSE', 'package.json'];
+	
+	for (const fileName of filesToCopy) {
+		const sourcePath = path.join(rootDir, fileName);
+		const destPath = path.join(distDir, fileName);
+		
+		try {
+			// Using Bun's native file API
+			const file = Bun.file(sourcePath);
+			await Bun.write(destPath, file);
+			log('copy', `Copied ${fileName}`);
+		} catch (error) {
+			console.warn(`[copy] Failed to copy ${fileName}:`, error);
+		}
+	}
+}
+
 async function main() {
 	log('clean', 'Removing dist directory');
 	await rm(distDir, { recursive: true, force: true });
 
 	await bundle();
 	await generateTypes();
+	await copyStaticFiles();
 
 	log('done', 'Build completed successfully');
 }

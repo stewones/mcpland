@@ -19,7 +19,6 @@
 		"noFallthroughCasesInSwitch": true,
 		"types": ["bun", "node"],
 		"paths": {
-			"mcpland": ["./src/index.ts"],
 			"mcpland/core": ["./src/core/index.ts"],
 			"mcpland/lib": ["./src/lib/index.ts"]
 		}

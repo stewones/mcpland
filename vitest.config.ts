@@ -22,13 +22,11 @@ export default defineConfig({
       all: true,
       include: ['src/**/*.ts'],
       exclude: [
-        'src/tools/**',
+        'src/mcps/**',
         'scripts/**',
         // type barrels and trivial re-exports
-        'src/index.ts',
         'src/core/index.ts',
-        'src/lib/index.ts',
-        'src/tools/index.ts',
+        'src/lib/index.ts'
       ],
     },
   },

@@ -1,7 +1,15 @@
 {
-	"tools": {
+	"name": "McpLand",
+	"description": "Aggregated MCP tools",
+	"source": "src/mcps",
+	"registry": {
 		"angular": {
-			"enabled": true
+			"enabled": true,
+			"tools": {
+				"docs": {
+					"enabled": true
+				}
+			}
 		}
 	}
 }

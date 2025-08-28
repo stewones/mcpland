@@ -1,3 +1,3 @@
-# MCPLand
+# McpLand
 
-Foundation for building MCP-based tools.
+Building blocks for implementing Model Context Protocol (MCP) tools.

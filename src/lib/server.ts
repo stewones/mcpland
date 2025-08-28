@@ -16,7 +16,7 @@ export function createMcpServer(
 	const server = new Server(
 		{
 			name: config.name,
-			version: config.version ?? '0.1.0',
+			version: config.version ?? '0.0.0',
 			description: config.description ?? `${config.name} MCP server`,
 		},
 		{ capabilities: { tools: {} } }

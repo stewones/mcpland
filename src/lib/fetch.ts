@@ -1,7 +1,12 @@
 export async function fetchWithRetry(
 	url: string,
-	maxRetries: number = 5,
-	baseDelayMs: number = 500
+	{
+		maxRetries = 5,
+		baseDelayMs = 500,
+	}: {
+		maxRetries?: number;
+		baseDelayMs?: number;
+	} = {}
 ): Promise<Response> {
 	let lastError: Error | undefined;
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -22,4 +27,3 @@ export async function fetchWithRetry(
 	}
 	throw lastError ?? new Error('fetchWithRetry: unknown error');
 }
-

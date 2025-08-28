@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { chunkText } from 'mcpland/lib';
+import { chunkText } from '../../../src/lib/chunker';
 
 describe('chunkText behavior', () => {
   it('returns empty array for empty input', () => {

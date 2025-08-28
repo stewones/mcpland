@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "Reusable Model Context Protocol (MCP) utilities and tools",
+  "description": "Building blocks for implementing Model Context Protocol (MCP) tools.",
   "scripts": {
     "dev": "bun build src/index.ts --outdir ./dist --target bun --watch",
     "build": "bun run format && bun run ./scripts/build.ts",
@@ -17,10 +17,6 @@
     "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json"
   },
   "exports": {
-    ".": {
-      "types": "./dist/types/src/index.d.ts",
-      "default": "./dist/index.js"
-    },
     "./core": {
       "types": "./dist/types/src/core/index.d.ts",
       "default": "./dist/core/index.js"
@@ -31,10 +27,12 @@
     }
   },
   "files": [
-    "dist/index.js",
     "dist/core",
-    "dist/tools",
-    "dist/types"
+    "dist/lib",
+    "dist/types",
+    "README.md",
+    "LICENSE",
+    "package.json"
   ],
   "dependencies": {
     "@ai-sdk/openai": "^2.0.5",
@@ -47,6 +45,7 @@
     "@types/bun": "^1.2.21",
     "@types/node": "^24.3.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "dedent": "^1.6.0",
     "format-imports": "^4.0.8",
     "typescript": "^5.9.2",
     "vite-tsconfig-paths": "^5.1.4",

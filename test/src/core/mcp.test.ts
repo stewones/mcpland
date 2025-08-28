@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import z from 'zod';
 
-import { MCPLandTool, type McpToolDefinition } from 'mcpland/core';
+import { McpLandTool } from '../../../src/core/mcp';
 
 // Mock the store to avoid bun/sqlite
 const searchSpy = vi.fn(async () => []);
 const ingestSpy = vi.fn(async () => {});
 
 vi.mock('../../../src/store', () => ({
-	DEFAULT_DB_PATH: '.data/context.sqlite',
+	DB_PATH: '.data/context.sqlite',
 	SqliteEmbedStore: class MockStore {
 		constructor(_path: string) {}
 		ingest = ingestSpy;
@@ -17,60 +18,52 @@ vi.mock('../../../src/store', () => ({
 
 // Mock lib helpers
 const chunkSpy = vi.fn((text, _opts) => ['c1', 'c2']);
-const startSpy = vi.fn(async (..._args: unknown[]) => ({}));
 
 vi.mock('mcpland/lib', () => ({
 	chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
-	startMcpServer: (...args: unknown[]) => startSpy(...args),
 }));
 
-vi.mock('ai/mcp-stdio', () => {
-	// Mock transport defined inside the mock factory
-	class MockTransport {
-		command: string;
-		args: string[];
-		constructor(opts: any) {
-			this.command = opts.command;
-			this.args = opts.args;
-		}
-	}
-	
-	return {
-		Experimental_StdioMCPTransport: MockTransport,
-	};
-});
+// Mock zod-to-json-schema
+vi.mock('zod-to-json-schema', () => ({
+	default: (schema: any) => ({ type: 'object' }),
+}));
 
-class TestTool extends MCPLandTool {
-	constructor(name = 'Foo-MCP') {
+// Mock config
+vi.mock('../../../src/config', () => ({
+	getSourceFolder: () => 'mcps',
+	isMcpToolEnabled: vi.fn(() => true),
+}));
+
+class TestTool extends McpLandTool {
+	constructor(name = 'Foo-MCP', mcpId?: string) {
 		super({
 			name,
 			description: 'desc',
 			sourceId: 'source-1',
+			mcpId: mcpId || 'foo',
+			toolId: 'bar',
 			contextUrl: 'http://example.com',
 			chunkOptions: { maxChars: 10, overlap: 2 },
+			schema: z.object({
+				query: z.string(),
+			}),
 		});
 	}
-	getTools(): McpToolDefinition[] {
-		return [
-			{
-				name: 'tool',
-				description: 'd',
-				inputSchema: {},
-				handler: async () => ({ content: [] }),
-			},
-		];
-	}
+	
 	async fetchContext(): Promise<string> {
 		return 'ctx';
 	}
+	
+	async handleContext(args: unknown) {
+		return { content: [] };
+	}
 }
 
-describe('MCPLandTool base class', () => {
+describe('McpLandTool base class', () => {
 	beforeEach(() => {
 		ingestSpy.mockClear();
 		searchSpy.mockClear();
 		chunkSpy.mockClear();
-		startSpy.mockClear();
 	});
 
 	it('init fetches context, chunks, and ingests with metadata', async () => {
@@ -83,20 +76,13 @@ describe('MCPLandTool base class', () => {
 		);
 	});
 
-	it('getTransport builds stdio transport pointing to tool server script', () => {
+	it('getTool returns tool definition with transformed schema', () => {
 		const tool = new TestTool('MyTool-MCP');
-		const transport = tool.getTransport() as unknown as any;
-		expect(transport.command).toBe('bun');
-		expect(transport.args[0]).toMatch(/src\/tools\/mytool-mcp\/server\.ts$/);
-	});
-
-	it('startMcpServer forwards config and tools', async () => {
-		const tool = new TestTool('Baz-MCP');
-		const res = await tool.startMcpServer();
-		expect(startSpy).toHaveBeenCalledWith(
-			expect.objectContaining({ name: 'Baz-MCP', description: 'desc' }),
-			expect.arrayContaining([expect.objectContaining({ name: 'tool' })])
-		);
+		const toolDef = tool.getTool();
+		expect(toolDef.name).toBe('MyTool-MCP');
+		expect(toolDef.description).toBe('desc');
+		expect(toolDef.inputSchema).toEqual({ type: 'object' });
+		expect(toolDef.handler).toBe(tool.handleContext);
 	});
 
 	it('searchContext delegates to store with source filter', async () => {
@@ -111,5 +97,187 @@ describe('MCPLandTool base class', () => {
 			limit: 20,
 			sourceId: 'source-1',
 		});
+	});
+
+	it('getToolPath returns correct path based on mcpId and toolId', () => {
+		const tool = new TestTool('Path-MCP');
+		const path = tool['getToolPath']();
+		expect(path).toBe('mcps/foo/tools/bar');
+	});
+});
+
+describe('McpLand base class', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('registers tools and initializes them', async () => {
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'test-mcp',
+					description: 'Test MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool1 = new TestTool('tool1', 'test-mcp');
+		const tool2 = new TestTool('tool2', 'test-mcp');
+
+		// Register tools
+		(mcp as any).registerTool(tool1, 'tool1');
+		(mcp as any).registerTool(tool2, 'tool2');
+
+		// Initialize
+		await mcp.init();
+
+		// Verify both tools were initialized
+		expect(ingestSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it('getTools returns all registered tool definitions', async () => {
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'test-mcp',
+					description: 'Test MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool1 = new TestTool('tool1', 'test-mcp');
+		const tool2 = new TestTool('tool2', 'test-mcp');
+
+		(mcp as any).registerTool(tool1, 'tool1');
+		(mcp as any).registerTool(tool2, 'tool2');
+
+		const tools = mcp.getTools();
+		expect(tools).toHaveLength(2);
+		expect(tools[0].name).toBe('test-mcp-tool1');
+		expect(tools[1].name).toBe('test-mcp-tool2');
+	});
+
+	it('registerTool normalizes tool names with MCP prefix', async () => {
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'my-mcp',
+					description: 'My MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool = new TestTool('simple-tool');
+		tool.spec.mcpId = 'my-mcp';
+
+		(mcp as any).registerTool(tool);
+
+		const tools = mcp.getTools();
+		expect(tools[0].name).toBe('my-mcp-simple-tool');
+	});
+
+	it('registerTool throws on missing tool spec', async () => {
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'test-mcp',
+					description: 'Test MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const invalidTool = { spec: null };
+
+		expect(() => (mcp as any).registerTool(invalidTool)).toThrow('Tool is missing required config');
+	});
+
+	it('registerTool throws on empty tool name', async () => {
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'test-mcp',
+					description: 'Test MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool = new TestTool('');
+
+		expect(() => (mcp as any).registerTool(tool)).toThrow('Tool is missing required spec.name');
+	});
+
+	it('registerTool skips disabled tools', async () => {
+		// Mock isMcpToolEnabled to return false for this specific test
+		vi.doMock('../../../src/config', () => ({
+			getSourceFolder: () => 'mcps',
+			isMcpToolEnabled: vi.fn((mcpName: string, toolName: string) => {
+				return toolName !== 'disabled'; // Return false for 'disabled' tool
+			}),
+		}));
+		
+		// Reset modules to pick up the new mock
+		vi.resetModules();
+		
+		const { McpLand } = await import('../../../src/core/mcp');
+		
+		// Need to reimport TestTool class after module reset
+		const { McpLandTool } = await import('../../../src/core/mcp');
+		
+		class LocalTestTool extends McpLandTool {
+			constructor(name: string, mcpId: string) {
+				super({
+					name,
+					description: 'desc',
+					sourceId: 'source-1',
+					mcpId: mcpId,
+					toolId: 'disabled',
+					contextUrl: 'http://example.com',
+					chunkOptions: { maxChars: 10, overlap: 2 },
+					schema: z.object({
+						query: z.string(),
+					}),
+				});
+			}
+			
+			async fetchContext(): Promise<string> {
+				return 'ctx';
+			}
+			
+			async handleContext(args: unknown) {
+				return { content: [] };
+			}
+		}
+		
+		class TestMcp extends McpLand {
+			constructor() {
+				super({
+					name: 'test-mcp',
+					description: 'Test MCP',
+				});
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool = new LocalTestTool('disabled-tool', 'test-mcp');
+
+		(mcp as any).registerTool(tool, 'disabled');
+
+		const tools = mcp.getTools();
+		expect(tools).toHaveLength(0);
 	});
 });

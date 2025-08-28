@@ -5,7 +5,6 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
 		"paths": {
-			"mcpland": ["./src/index.ts"],
 			"mcpland/core": ["./src/core/index.ts"],
 			"mcpland/lib": ["./src/lib/index.ts"]
 		}

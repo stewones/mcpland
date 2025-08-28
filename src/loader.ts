@@ -1,41 +1,78 @@
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import type { MCPLandTool } from 'mcpland/core';
+import type { McpLand } from 'mcpland/core';
+import { McpRegistry } from 'mcpland/core';
 
-import { isToolEnabled } from './config';
+import {
+	getRootDir,
+	getSourceFolder,
+	isMcpEnabled,
+	isMcpToolEnabled,
+} from './config';
 
-const tools: MCPLandTool[] = [];
+const sourceFolder = getSourceFolder();
+const rootDir = getRootDir();
+const resolvedSourceDir = path.resolve(rootDir, sourceFolder);
+const availableMcps = readdirSync(resolvedSourceDir);
 
-const availableTools = readdirSync(path.join(__dirname, 'tools'));
+// Calculate relative path from loader location to source directory
+const loaderDir = __dirname;
+const relativeSourcePath = path.relative(loaderDir, resolvedSourceDir);
 
-for (const tool of availableTools) {
-	const toolModule = await import(`./tools/${tool}`);
-	if (toolModule.default) {
-		const instance: MCPLandTool = toolModule.default;
-		const name = instance['config']?.name;
-		const description = instance['config']?.description;
-		const sourceId = instance['config']?.sourceId;
+for (const mcp of availableMcps) {
+	const mcpModule = await import(`./${relativeSourcePath}/${mcp}`);
+	if (mcpModule.default) {
+		const instance: McpLand = mcpModule.default;
+		const name = instance['spec']?.name;
+
 		if (typeof name !== 'string' || name.trim().length === 0) {
 			throw new Error(
-				`Tool at "src/tools/${tool}" is missing required config.name`
+				`MCP at "${sourceFolder}/${mcp}" is missing required config.name`
 			);
 		}
-		if (typeof description !== 'string' || description.trim().length === 0) {
-			throw new Error(
-				`Tool at "src/tools/${tool}" is missing required config.description`
-			);
-		}
-		if (typeof sourceId !== 'string' || sourceId.trim().length === 0) {
-			throw new Error(
-				`Tool at "src/tools/${tool}" is missing required config.sourceId`
-			);
-		}
-		console.warn('Loading tool', name);
-		if (isToolEnabled(name)) {
-			tools.push(instance);
+
+		if (isMcpEnabled(name)) {
+			try {
+				const toolsDir = path.join(resolvedSourceDir, mcp, 'tools');
+				const availableTools = readdirSync(toolsDir).filter(
+					(it) => !it.endsWith('.ts') && !it.endsWith('.js')
+				);
+
+				for (const toolFolder of availableTools) {
+					if (!isMcpToolEnabled(name, toolFolder)) continue;
+					const toolModule = await import(
+						`./${relativeSourcePath}/${mcp}/tools/${toolFolder}`
+					);
+					const maybeDefault = toolModule.default;
+
+					if (maybeDefault) {
+						try {
+							const toolInstance =
+								typeof maybeDefault === 'function'
+									? new maybeDefault()
+									: maybeDefault;
+							// Cast to any to use extended registration signature with discovered tool id
+							(instance as any).registerTool(toolInstance, toolFolder);
+						} catch (err) {
+							throw new Error(
+								`Failed to register tool ${name}/${toolFolder}: ${JSON.stringify(err, null, 2)}`
+							);
+						}
+					} else {
+						throw new Error(
+							`Tool ${name}/${toolFolder} is missing a default export`
+						);
+					}
+				}
+
+				McpRegistry.register(instance);
+			} catch (_err) {
+				console.error('Failed to load tools for MCP', name, _err);
+			}
 		}
 	}
 }
 
-export { tools };
+// Export the legacy mcps array for backward compatibility
+export const mcps = McpRegistry.getAll().map(entry => entry.mcp);

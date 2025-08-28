@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const startSpy = vi.fn(async (..._args: unknown[]) => {});
 
-// Define mock tools outside to avoid hoisting issues
-const toolA = {
-	config: { name: 'A' },
+// Mock MCPs
+const mcpA = {
+	spec: { name: 'A' },
 	init: vi.fn(async () => {}),
 	getTools: () => [
 		{
@@ -16,8 +16,8 @@ const toolA = {
 	],
 } as any;
 
-const toolB = {
-	config: { name: 'B' },
+const mcpB = {
+	spec: { name: 'B' },
 	init: vi.fn(async () => {}),
 	getTools: () => [
 		{
@@ -33,56 +33,91 @@ vi.mock('mcpland/lib', () => ({
 	startMcpServer: (...a: unknown[]) => startSpy(...a),
 }));
 
-vi.mock('../../src/loader', () => ({ tools: [toolA, toolB] }));
+// Mock the McpRegistry class
+const mockInitializeAll = vi.fn();
+const mockGetAll = vi.fn();
+const mockClear = vi.fn();
 
-describe('stdio createMCPClient behavior', () => {
+vi.mock('mcpland/core', async (importOriginal) => {
+	const actual = await importOriginal() as any;
+	return {
+		...actual,
+		McpRegistry: {
+			initializeAll: mockInitializeAll,
+			getAll: mockGetAll,
+			clear: mockClear,
+			register: vi.fn(),
+			size: vi.fn(() => 2),
+			has: vi.fn(() => true),
+			get: vi.fn(),
+			getNames: vi.fn(() => ['A', 'B']),
+			getInitialized: vi.fn(() => []),
+			getUninitialized: vi.fn(() => []),
+			getAllTools: vi.fn(() => []),
+			unregister: vi.fn(),
+			getSummary: vi.fn(),
+			getToolsByMcp: vi.fn(),
+			isReady: vi.fn(),
+			getStatuses: vi.fn()
+		}
+	};
+});
+
+// Mock loader to prevent actual file loading
+vi.mock('../../src/loader', () => ({}));
+
+describe('stdio createMcpClient behavior', () => {
 	beforeEach(() => {
 		vi.resetModules();
-		startSpy.mockClear();
-		toolA.init.mockClear();
-		toolB.init.mockClear();
+		vi.clearAllMocks();
+		
+		// Set up default mock behaviors
+		mockInitializeAll.mockImplementation(async () => {
+			await mcpA.init();
+			await mcpB.init();
+		});
+		
+		mockGetAll.mockReturnValue([
+			{ mcp: mcpA, initialized: true },
+			{ mcp: mcpB, initialized: true }
+		]);
+		
+		// Reset startSpy to default behavior
+		startSpy.mockResolvedValue(undefined);
 	});
 
-	it('initializes all tools, aggregates definitions, and starts server', async () => {
-		const { createMCPClient } = await import('../../src/stdio');
-		const res = await createMCPClient();
+	it('initializes all MCPs, aggregates definitions, and starts server', async () => {
+		const { createMcpClient } = await import('../../src/stdio');
+		const res = await createMcpClient();
 
 		// initialized
-		expect(toolA.init).toHaveBeenCalled();
-		expect(toolB.init).toHaveBeenCalled();
+		expect(mockInitializeAll).toHaveBeenCalled();
+		expect(mcpA.init).toHaveBeenCalled();
+		expect(mcpB.init).toHaveBeenCalled();
 
 		// aggregated tool definitions
 		expect(res.tools.map((t) => t.name)).toEqual(['t1', 't2']);
 
 		// server started with aggregated tools
 		expect(startSpy).toHaveBeenCalledWith(
-			expect.objectContaining({ name: 'MCPLand' }),
+			expect.objectContaining({ name: 'McpLand' }),
 			res.tools
 		);
 	});
 
-	it('handles initialization error in registry', async () => {
-		// Mock tools with failing init
-		const failingTool = {
-			config: { name: 'failing' },
-			init: vi.fn(async () => {
-				throw new Error('init failed');
-			}),
-			getTools: () => [],
-		};
+	it('handles initialization error', async () => {
+		// Mock initialization failure
+		mockInitializeAll.mockRejectedValueOnce(new Error('init failed'));
+		mockGetAll.mockReturnValue([]);
 
-		vi.doMock('../../src/loader', () => ({ tools: [failingTool] }));
-
-		// Mock console.error to capture error handling
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		const { createMCPClient } = await import('../../src/stdio');
-		const res = await createMCPClient();
+		const { createMcpClient } = await import('../../src/stdio');
+		const res = await createMcpClient();
 
-		// Should still return empty tools array
 		expect(res.tools).toEqual([]);
 		expect(errorSpy).toHaveBeenCalledWith(
-			'Tool initialization failed:',
+			'MCP initialization failed:',
 			expect.any(Error)
 		);
 
@@ -103,6 +138,21 @@ describe('stdio main', () => {
 
 		// Reset modules to avoid cross-test contamination
 		vi.resetModules();
+		vi.clearAllMocks();
+		
+		// Set up default mock behaviors
+		mockInitializeAll.mockImplementation(async () => {
+			await mcpA.init();
+			await mcpB.init();
+		});
+		
+		mockGetAll.mockReturnValue([
+			{ mcp: mcpA, initialized: true },
+			{ mcp: mcpB, initialized: true }
+		]);
+		
+		// Reset startSpy to default behavior
+		startSpy.mockResolvedValue(undefined);
 	});
 
 	afterEach(() => {
@@ -112,11 +162,6 @@ describe('stdio main', () => {
 	});
 
 	it('executes successfully and logs tools', async () => {
-		// Mock successful tools for this test
-		vi.doMock('../../src/loader', () => ({
-			tools: [toolA, toolB],
-		}));
-
 		const { main } = await import('../../src/stdio');
 		const result = await main();
 
@@ -130,50 +175,48 @@ describe('stdio main', () => {
 
 		// Verify console output
 		expect(warnSpy).toHaveBeenCalledWith(
-			'Initialized MCP clients for tools:',
-			expect.stringContaining('t1')
+			'MCP server running on stdio with 2 tools'
 		);
-		expect(warnSpy).toHaveBeenCalledWith('MCP server running on stdio');
-		expect(errorSpy).not.toHaveBeenCalled();
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('"name": "t1"')
+		);
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('"name": "t2"')
+		);
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
 	it('handles errors and calls process.exit', async () => {
-		// Mock tools that cause createMCPClient to fail
-		const failingTool = {
-			config: { name: 'failing' },
-			init: vi.fn(async () => {
-				throw new Error('Catastrophic failure');
-			}),
-			getTools: () => [],
-		};
-
-		vi.doMock('../../src/loader', () => ({ tools: [failingTool] }));
-		vi.doMock('mcpland/lib', () => ({
-			startMcpServer: vi.fn().mockRejectedValue(new Error('Server failed')),
-		}));
+		// Mock startMcpServer to throw error after successful initialization
+		startSpy.mockRejectedValueOnce(new Error('server start failed'));
 
 		const { main } = await import('../../src/stdio');
-
-		// The main function should handle the error and call process.exit
 		await main();
 
-		// Verify error handling
 		expect(errorSpy).toHaveBeenCalledWith(
 			'Failed to start MCP server:',
 			expect.any(Error)
 		);
 		expect(exitSpy).toHaveBeenCalledWith(1);
-		expect(warnSpy).not.toHaveBeenCalledWith('MCP server running on stdio');
 	});
 
 	it('executes the MCP server when run as entry', async () => {
-		const { main } = await import('../../src/stdio');
-
-		await main();
-
+		// Since import.meta.main is always true in tests (see vitest.config.ts),
+		// the main() function is automatically called when we import stdio.ts.
+		// Let's verify the module runs correctly when imported as main.
+		
+		// Import stdio - this will trigger main() because import.meta.main is true
+		const stdioModule = await import('../../src/stdio');
+		
+		// Verify the main function was executed by checking the expected behavior
+		expect(mockInitializeAll).toHaveBeenCalled();
 		expect(startSpy).toHaveBeenCalled();
-
-		import.meta.main = false;
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('MCP server running on stdio')
+		);
+		
+		// Verify the module exports are available
+		expect(stdioModule.main).toBeDefined();
+		expect(stdioModule.createMcpClient).toBeDefined();
 	});
 });

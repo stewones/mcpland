@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createMcpServer, startMcpServer } from 'mcpland/lib';
-
 import {
 	CallToolRequestSchema,
 	ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+
+import { createMcpServer, startMcpServer } from '../../../src/lib/server';
 
 // Mocks for MCP SDK
 vi.mock('@modelcontextprotocol/sdk/types.js', () => ({
