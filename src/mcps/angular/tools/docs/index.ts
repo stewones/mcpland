@@ -1,7 +1,6 @@
 import z from 'zod';
 
-import { McpLandTool, type McpToolSpec } from 'mcpland/core';
-import { fetchWithRetry } from 'mcpland/lib';
+import { fetchWithRetry, McpLandTool, type McpToolSpec } from 'mcpland';
 
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
 

@@ -7,7 +7,7 @@ import {
 	getSourceFolder,
 	isMcpToolEnabled,
 	SqliteEmbedStore,
-} from 'mcpland/lib';
+} from 'mcpland';
 
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
 

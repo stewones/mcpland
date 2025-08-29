@@ -10,7 +10,7 @@ const ingestSpy = vi.fn(async () => {});
 // Mock lib helpers
 const chunkSpy = vi.fn((text, _opts) => ['c1', 'c2']);
 
-vi.mock('mcpland/lib', () => ({
+vi.mock('mcpland', () => ({
 	chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
 	DB_PATH: '.data/context.sqlite',
 	SqliteEmbedStore: class MockStore {
@@ -216,7 +216,7 @@ describe('McpLand base class', () => {
 
 	it('registerTool skips disabled tools', async () => {
 		// Mock isMcpToolEnabled to return false for this specific test
-		vi.doMock('mcpland/lib', () => ({
+		vi.doMock('mcpland', () => ({
 			chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
 			DB_PATH: '.data/context.sqlite',
 			SqliteEmbedStore: class MockStore {

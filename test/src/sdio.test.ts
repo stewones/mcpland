@@ -29,11 +29,7 @@ const mcpB = {
 	],
 } as any;
 
-vi.mock('mcpland/lib', () => ({
-	loadAvailableMcps: vi.fn(async () => {}),
-	loadConfig: vi.fn(() => ({ name: 'McpLand' })),
-	stdio: vi.fn(async () => ({ tools: [] })),
-}));
+// This mock is replaced by the more comprehensive mock below
 
 // Mock the server module functions
 vi.mock('../../src/lib/server', () => ({
@@ -89,10 +85,17 @@ const mockInitializeAll = vi.fn();
 const mockGetAll = vi.fn();
 const mockClear = vi.fn();
 
-vi.mock('mcpland/core', async (importOriginal) => {
+const mockedMain = vi.fn(() => true);
+const mockedStdio = vi.fn(async () => ({ tools: [] }));
+
+vi.mock('mcpland', async (importOriginal) => {
 	const actual = await importOriginal() as any;
 	return {
 		...actual,
+		main: mockedMain, // Mock main to return true for testing
+		stdio: mockedStdio, // Mock stdio function
+		loadAvailableMcps: vi.fn(async () => {}),
+		loadConfig: vi.fn(() => ({ name: 'McpLand' })),
 		McpRegistry: {
 			initializeAll: mockInitializeAll,
 			getAll: mockGetAll,
@@ -256,25 +259,23 @@ describe('stdio main', () => {
 	});
 
 	it('executes the MCP server when run as entry', async () => {
-		// Since import.meta.main is always true in tests (see vitest.config.ts),
-		// the stdio() function is automatically called when we import stdio.ts.
-		// However, the stdio.ts file imports from mcpland/lib, which we've mocked.
-		
-		// Reset mocks first
+		// Clear all mocks and reset modules to start fresh
+		vi.resetModules();
 		vi.clearAllMocks();
 		
-		// Import stdio - this will trigger stdio() because import.meta.main is true
-		const stdioModule = await import('../../src/stdio');
+		// Ensure main returns true so stdio will be called
+		mockedMain.mockReturnValue(true);
 		
-		// The actual stdio module should call the mocked stdio function from mcpland/lib
+		// Import stdio module - this should trigger the main() check and stdio() call
+		await import('../../src/stdio');
+		
 		// Give it a moment to complete async operations
 		await new Promise(resolve => setTimeout(resolve, 10));
 		
-		// Since stdio.ts imports stdio from mcpland/lib and calls it, 
-		// and we've mocked mcpland/lib to include stdio that calls our mocks,
-		// the behavior should be observable
-		// However, since the real stdio.ts doesn't export anything,
-		// let's just verify the module loads without error
-		expect(typeof stdioModule).toBe('object');
+		// Verify that main() was called to check if running as entry point
+		expect(mockedMain).toHaveBeenCalled();
+		
+		// Verify that stdio() was called since main() returns true
+		expect(mockedStdio).toHaveBeenCalled();
 	});
 });

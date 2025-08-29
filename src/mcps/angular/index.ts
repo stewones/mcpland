@@ -1,4 +1,4 @@
-import { McpLand } from 'mcpland/core';
+import { McpLand } from 'mcpland';
 
 class AngularMCP extends McpLand {
 	static name = 'angular';

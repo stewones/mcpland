@@ -30,7 +30,7 @@ vi.mock('../../../src/lib/config', () => ({
   getSourceFolder: mockGetSourceFolder,
 }));
 
-vi.mock('mcpland/core', () => ({
+vi.mock('mcpland', () => ({
   McpRegistry: {
     register: mockRegister,
   },

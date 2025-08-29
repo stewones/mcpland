@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { Target } from 'bun';
 import dedent from 'dedent';
 
 import { cp, rm } from 'node:fs/promises';
@@ -49,17 +50,7 @@ async function bundle(): Promise<void> {
 	);
 
 	const exec = [
-		build(
-			[path.join(rootDir, 'src/core/index.ts')],
-			externals,
-			`${distDir}/core`
-		),
-		build(
-			[path.join(rootDir, 'src/lib/index.ts')],
-			externals,
-			`${distDir}/lib`
-		),
-		build([path.join(rootDir, 'src/stdio.ts')], externals, distDir),
+		build([path.join(rootDir, 'src/index.ts')], externals, distDir),
 		build([path.join(rootDir, 'src/bin.ts')], externals, distDir),
 	];
 
@@ -70,14 +61,15 @@ function build(
 	entrypoints: string[],
 	external: string[],
 	outdir: string,
-	format: 'esm' | 'cjs' | 'iife' = 'esm'
+	format: 'esm' | 'cjs' | 'iife' = 'esm',
+	target: Target = 'node'
 ) {
 	return new Promise<void>(async (resolve, reject) => {
 		await Bun.build({
 			entrypoints,
 			outdir,
 			tsconfig: path.join(rootDir, 'tsconfig.json'),
-			target: 'node',
+			target,
 			minify: shouldMinify,
 			sourcemap: 'external',
 			external,

@@ -45,7 +45,7 @@ export class LinkCommand extends McpLandCommand {
 				? cfg.mcpServers
 				: {};
 
-		const jsPath = path.join(root, 'node_modules', 'mcpland', 'stdio.js');
+		const jsPath = path.join(root, 'node_modules', 'mcpland', 'index.js');
 
 		const stdioPath = jsPath;
 

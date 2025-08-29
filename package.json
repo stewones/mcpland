@@ -23,31 +23,17 @@
     "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json"
   },
   "exports": {
-    "./core": {
-      "types": "./types/core/index.d.ts",
-      "default": "./core/index.js"
-    },
-    "./lib": {
-      "types": "./types/lib/index.d.ts",
-      "default": "./lib/index.js"
-    },
-    "./stdio": {
-      "types": "./types/stdio.d.ts",
-      "default": "./stdio.js"
-    },
-    "./bin": {
-      "types": "./types/bin/index.d.ts",
-      "default": "./bin.js"
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./index.js"
     }
   },
   "files": [
-    "stdio.js",
-    "stdio.js.map",
+    "types",
+    "index.js",
+    "index.js.map",
     "bin.js",
     "bin.js.map",
-    "core",
-    "lib",
-    "types",
     "package.json",
     "README.md",
     "LICENSE"

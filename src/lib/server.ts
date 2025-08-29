@@ -1,9 +1,11 @@
 import {
+	loadAvailableMcps,
+	loadConfig,
 	McpRegistry,
 	type McpServerConfig,
 	type McpToolDefinition,
-} from 'mcpland/core';
-import { loadAvailableMcps, loadConfig } from 'mcpland/lib';
+	SqliteEmbedStore,
+} from 'mcpland';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -119,6 +121,11 @@ export async function createMcpClient(): Promise<{
 
 export async function stdio() {
 	console.warn('Starting MCP stdio');
+
+	process.on('SIGTERM', () => {
+		console.warn('Shutting down MCPLand stdio');
+		SqliteEmbedStore.shutdown();
+	});
 
 	await loadAvailableMcps();
 

@@ -1,4 +1,4 @@
-import type { McpLand, McpToolDefinition } from 'mcpland/core';
+import type { McpLand, McpToolDefinition } from 'mcpland';
 
 export interface McpRegistryEntry {
 	mcp: McpLand;

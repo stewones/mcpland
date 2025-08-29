@@ -1,10 +1,5 @@
-#!/usr/bin/env bun
+import { main, stdio } from 'mcpland';
 
-import { SqliteEmbedStore, stdio } from 'mcpland/lib';
-
-stdio();
-
-process.on('SIGTERM', () => {
-	console.warn('Shutting down MCPLand stdio');
-	SqliteEmbedStore.shutdown();
-});
+if (main()) {
+	stdio();
+}
