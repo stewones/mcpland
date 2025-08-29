@@ -24,16 +24,15 @@ mcp link cursor
 
 ## Data Flow
 
-```
 1. 📥 Context Ingestion
-   External Source → Fetcher → Chunker → Embedder → SQLite Store
+   `External Source → Fetcher → Chunker → Embedder → SQLite Store`
 
 2. 🔍 Query Processing  
-   LLM Query → MCP Server → Tool Handler → Vector Search → Ranked Results
+   `LLM Query → MCP Server → Tool Handler → Vector Search → Ranked Results`
 
 3. 📤 Response Generation
-   Search Results → Context Assembly → MCP Response → LLM Client
-```
+   `Search Results → Context Assembly → MCP Response → LLM Client`
+
 
 ## Technical Features
 
