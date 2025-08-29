@@ -12,14 +12,12 @@
     "url": "https://github.com/stewones/mcpland.git"
   },
   "scripts": {
-    "dev": "bun build src/index.ts --outdir ./dist --target bun --watch",
     "build": "bun run format && bun run ./scripts/build.ts",
-    "build:prod": "bun run format && bun run ./scripts/build.ts --minify",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "coverage": "vitest run --coverage && open coverage/index.html",
+    "coverage": "bun run test:coverage && open coverage/index.html",
     "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json"
   },
   "exports": {
