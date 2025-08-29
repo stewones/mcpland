@@ -5,6 +5,7 @@ coverage
 
 # AI
 .claude
+.cursor
 
 # Environment variables
 .env

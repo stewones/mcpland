@@ -64,8 +64,9 @@ describe('McpTool base class', () => {
 		await tool.init();
 		expect(chunkSpy).toHaveBeenCalledWith('ctx', { maxChars: 10, overlap: 2 });
 		expect(ingestSpy).toHaveBeenCalledWith(
-			{ id: 'source-1', meta: { name: 'Bar-MCP', url: 'http://example.com' } },
-			['c1', 'c2']
+			{ id: 'source-1', meta: { name: 'Bar-MCP', url: 'http://example.com', file: undefined } },
+			['c1', 'c2'],
+			{ mcpId: 'foo', toolId: 'bar' }
 		);
 	});
 
@@ -75,7 +76,9 @@ describe('McpTool base class', () => {
 		expect(toolDef.name).toBe('MyTool-MCP');
 		expect(toolDef.description).toBe('desc');
 		expect(toolDef.inputSchema).toEqual({ type: 'object' });
-		expect(toolDef.handler).toBe(tool.handleContext);
+		// Handler is now bound to the tool instance
+		expect(typeof toolDef.handler).toBe('function');
+		expect(toolDef.handler.name).toBe('bound handleContext');
 	});
 
 	it('searchContext delegates to store with source filter', async () => {

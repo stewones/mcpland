@@ -5,13 +5,14 @@ import { fetchWithRetry, McpTool, type McpToolSpec } from 'mcpland';
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
 
 const contextUrl = 'https://angular.dev/context/llm-files/llms-full.txt';
+const chunkOptions = { maxChars: 1200, overlap: 200 };
 
 const spec: McpToolSpec = {
 	name: 'docs',
 	description: 'Angular docs context search tool.',
 	sourceId: 'angular-llm-context',
-	contextUrl: contextUrl,
-	chunkOptions: { maxChars: 1200, overlap: 200 },
+	contextUrl,
+	chunkOptions,
 	schema: z.object({
 		query: z
 			.string()

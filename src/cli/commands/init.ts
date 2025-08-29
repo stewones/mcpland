@@ -269,7 +269,8 @@ function toolHasContextUrl(toolDir: string): boolean {
 			const s = statSync(file);
 			if (s.isFile()) {
 				const content = readFileSync(file, 'utf-8');
-				if (/contextUrl\s*:/.test(content)) return true;
+				if (/contextUrl\s*:/.test(content) || /contextFile\s*:/.test(content))
+					return true;
 			}
 		} catch {}
 	}
@@ -281,7 +282,8 @@ function toolHasContextUrl(toolDir: string): boolean {
 				const st = statSync(p);
 				if (st.isFile()) {
 					const content = readFileSync(p, 'utf-8');
-					if (/contextUrl\s*:/.test(content)) return true;
+					if (/contextUrl\s*:/.test(content) || /contextFile\s*:/.test(content))
+						return true;
 				}
 			} catch {}
 		}

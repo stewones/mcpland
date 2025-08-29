@@ -88,42 +88,42 @@ describe('SqliteEmbedStore behavior', () => {
     expect(params[1]).toBe(JSON.stringify({ x: 1 }));
   });
 
-  it('ingests chunks, skipping duplicates and embedding new ones', async () => {
-    const store = new SqliteEmbedStore('.data/test.sqlite');
+  	it('ingests chunks, skipping duplicates and embedding new ones', async () => {
+		const store = new SqliteEmbedStore('.data/test.sqlite');
 
-    // First chunk will be seen as duplicate due to queryMock get() returning a row
-    // Second chunk different content will still be considered duplicate because get() always returns {id:'exists'}
-    await store.ingest({ id: 'source', meta: {} }, ['dup', 'dup2']);
+		// First chunk will be seen as duplicate due to queryMock get() returning a row
+		// Second chunk different content will still be considered duplicate because get() always returns {id:'exists'}
+		await store.ingest({ id: 'source', meta: {} }, ['dup', 'dup2'], { mcpId: 'test-mcp', toolId: 'test-tool' });
 
-    // Since get() returns a row, insert never called
-    expect(dbRun).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO chunks'), expect.anything());
-  });
+		// Since get() returns a row, insert never called
+		expect(dbRun).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO chunks'), expect.anything());
+	});
 
-  it('ingests new chunks and calls embedText and insertChunk', async () => {
-    const store = new SqliteEmbedStore('.data/test.sqlite');
+  	it('ingests new chunks and calls embedText and insertChunk', async () => {
+		const store = new SqliteEmbedStore('.data/test.sqlite');
 
-    // Create a temporary mock that returns no existing chunks
-    const tempQueryMock = vi.fn((sql: string) => ({
-      get: (...params: any[]) => {
-        if (sql.includes('WHERE source_id=? AND hash=?')) return undefined; // No existing chunks
-        if (sql.includes('COUNT(1)')) return { cnt: 0 };
-        return undefined;
-      },
-      all: () => []
-    } as any));
+		// Create a temporary mock that returns no existing chunks
+		const tempQueryMock = vi.fn((sql: string) => ({
+			get: (...params: any[]) => {
+				if (sql.includes('WHERE source_id=? AND hash=?')) return undefined; // No existing chunks
+				if (sql.includes('COUNT(1)')) return { cnt: 0 };
+				return undefined;
+			},
+			all: () => []
+		} as any));
 
-    // Temporarily override the mock
-    const originalQuery = (store as any).db.query;
-    (store as any).db.query = tempQueryMock;
+		// Temporarily override the mock
+		const originalQuery = (store as any).db.query;
+		(store as any).db.query = tempQueryMock;
 
-    await store.ingest({ id: 'newsource', meta: { version: 1 } }, ['new content', 'another new']);
+		await store.ingest({ id: 'newsource', meta: { version: 1 } }, ['new content', 'another new'], { mcpId: 'test-mcp', toolId: 'test-tool' });
 
-    // Should have called insert for new chunks
-    expect(dbRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO chunks'), expect.anything());
-    
-    // Restore original mock
-    (store as any).db.query = originalQuery;
-  });
+		// Should have called insert for new chunks
+		expect(dbRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO chunks'), expect.anything());
+		
+		// Restore original mock
+		(store as any).db.query = originalQuery;
+	});
 
   it('embedText method works independently', async () => {
     const store = new SqliteEmbedStore('.data/test.sqlite');

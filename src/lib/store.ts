@@ -14,7 +14,11 @@ export const DB_PATH = '.data/context.sqlite';
 
 export type Source = {
 	id: string; // Stable ID for the source (e.g., 'angular-llm-context')
-	meta?: Record<string, any>;
+	meta?: {
+		name: string;
+		url?: string;
+		file?: string;
+	};
 };
 
 export type SearchResult = {
@@ -149,10 +153,12 @@ export class SqliteEmbedStore {
 		return embedding;
 	}
 
-	async ingest(source: Source, chunks: string[]) {
+	async ingest(
+		source: Source,
+		chunks: string[],
+		{ mcpId, toolId }: { mcpId: string; toolId: string }
+	) {
 		this.upsertSource(source);
-
-		console.warn('Ingesting chunks', chunks.length);
 
 		let idx = 0;
 		for (const content of chunks) {
@@ -173,6 +179,10 @@ export class SqliteEmbedStore {
 			console.warn('Inserted chunk', idx);
 			idx++;
 		}
+
+		console.warn(
+			`Finished ingestion for ${mcpId}/${toolId} with ${idx} chunks`
+		);
 	}
 
 	async search(

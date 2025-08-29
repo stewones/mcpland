@@ -32,6 +32,8 @@ export interface McpToolSpec {
 	toolId?: string;
 	/** URL to fetch context from on tool initialization */
 	contextUrl?: string;
+	/** File pathname relative to the tool directory to fetch context from on tool initialization */
+	contextFile?: string;
 	/** Options for chunking the context */
 	chunkOptions?: {
 		maxChars?: number;
@@ -161,9 +163,14 @@ export abstract class McpTool {
 				meta: {
 					name: this.spec.name,
 					url: this.spec.contextUrl,
+					file: this.spec.contextFile,
 				},
 			},
-			chunks
+			chunks,
+			{
+				mcpId,
+				toolId,
+			}
 		);
 	}
 
@@ -173,7 +180,7 @@ export abstract class McpTool {
 	}
 
 	// Embedding-based search
-	protected async searchContext(query: string, limit = 20) {
+	public async searchContext(query: string, limit = 20) {
 		return this.store.search(query, {
 			limit,
 			sourceId: this.spec.sourceId!,
@@ -185,7 +192,7 @@ export abstract class McpTool {
 			name: this.spec.name,
 			description: this.spec.description,
 			inputSchema: zodToJsonSchema(this.spec.schema),
-			handler: this.handleContext,
+			handler: this.handleContext.bind(this),
 		};
 	}
 }
