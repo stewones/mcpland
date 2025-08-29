@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import z from 'zod';
 
-import { McpLandTool } from '../../../src/core/mcp';
+import { McpTool } from '../../../src/core/mcp';
 
 // Mock the store to avoid bun/sqlite
 const searchSpy = vi.fn(async () => []);
@@ -27,7 +27,7 @@ vi.mock('zod-to-json-schema', () => ({
 	default: (schema: any) => ({ type: 'object' }),
 }));
 
-class TestTool extends McpLandTool {
+class TestTool extends McpTool {
 	constructor(name = 'Foo-MCP', mcpId?: string) {
 		super({
 			name,
@@ -52,7 +52,7 @@ class TestTool extends McpLandTool {
 	}
 }
 
-describe('McpLandTool base class', () => {
+describe('McpTool base class', () => {
 	beforeEach(() => {
 		ingestSpy.mockClear();
 		searchSpy.mockClear();
@@ -236,9 +236,9 @@ describe('McpLand base class', () => {
 		const { McpLand } = await import('../../../src/core/mcp');
 		
 		// Need to reimport TestTool class after module reset
-		const { McpLandTool } = await import('../../../src/core/mcp');
+		const { McpTool } = await import('../../../src/core/mcp');
 		
-		class LocalTestTool extends McpLandTool {
+		class LocalTestTool extends McpTool {
 			constructor(name: string, mcpId: string) {
 				super({
 					name,

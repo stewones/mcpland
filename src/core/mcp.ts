@@ -52,7 +52,7 @@ export interface McpServerConfig {
 	description?: string;
 }
 
-export abstract class McpLand<ExtendedTool extends McpLandTool = McpLandTool> {
+export abstract class McpLand<ExtendedTool extends McpTool = McpTool> {
 	public readonly spec: McpSpec;
 	protected readonly tools: ExtendedTool[] = [];
 
@@ -107,7 +107,7 @@ export abstract class McpLand<ExtendedTool extends McpLandTool = McpLandTool> {
 	}
 }
 
-export abstract class McpLandTool {
+export abstract class McpTool {
 	public readonly spec: McpToolSpec;
 	protected readonly store: SqliteEmbedStore;
 

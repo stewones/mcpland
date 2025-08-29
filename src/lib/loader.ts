@@ -1,6 +1,5 @@
 import { readdirSync } from 'node:fs';
-import path, { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 import { type McpLand, McpRegistry } from 'mcpland';
 
@@ -79,17 +78,4 @@ export async function loadAvailableMcps() {
 			}
 		}
 	}
-}
-
-export function main() {
-	const currentFilePath = resolve(fileURLToPath(import.meta.url));
-	const mainScriptPath = resolve(process.argv[1]);
-
-	const isExecutedDirectly = currentFilePath.includes(mainScriptPath);
-
-	if (isExecutedDirectly) {
-		return true;
-	}
-
-	return false;
 }

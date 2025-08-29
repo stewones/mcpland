@@ -1,10 +1,8 @@
 import {
-	loadAvailableMcps,
 	loadConfig,
 	McpRegistry,
 	type McpServerConfig,
 	type McpToolDefinition,
-	SqliteEmbedStore,
 } from 'mcpland';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -117,26 +115,4 @@ export async function createMcpClient(): Promise<{
 	return {
 		tools: allToolDefs,
 	};
-}
-
-export async function stdio() {
-	console.warn('Starting MCP stdio');
-
-	process.on('SIGTERM', () => {
-		console.warn('Shutting down MCPLand stdio');
-		SqliteEmbedStore.shutdown();
-	});
-
-	await loadAvailableMcps();
-
-	return createMcpClient()
-		.then(({ tools }) => {
-			console.warn(`MCP server running on stdio with ${tools.length} tools`);
-			console.warn(JSON.stringify(tools, null, 2));
-			return { tools };
-		})
-		.catch((error) => {
-			console.error('Failed to start MCP server:', error);
-			process.exit(1);
-		});
 }

@@ -1,6 +1,6 @@
 import z from 'zod';
 
-import { fetchWithRetry, McpLandTool, type McpToolSpec } from 'mcpland';
+import { fetchWithRetry, McpTool, type McpToolSpec } from 'mcpland';
 
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
 
@@ -27,7 +27,7 @@ const spec: McpToolSpec = {
 	}),
 };
 
-export class AngularDocsTool extends McpLandTool {
+export class AngularDocsTool extends McpTool {
 	constructor() {
 		super(spec);
 	}
