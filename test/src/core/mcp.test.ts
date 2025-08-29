@@ -7,31 +7,24 @@ import { McpLandTool } from '../../../src/core/mcp';
 const searchSpy = vi.fn(async () => []);
 const ingestSpy = vi.fn(async () => {});
 
-vi.mock('../../../src/store', () => ({
+// Mock lib helpers
+const chunkSpy = vi.fn((text, _opts) => ['c1', 'c2']);
+
+vi.mock('mcpland/lib', () => ({
+	chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
 	DB_PATH: '.data/context.sqlite',
 	SqliteEmbedStore: class MockStore {
 		constructor(_path: string) {}
 		ingest = ingestSpy;
 		search = searchSpy;
 	},
-}));
-
-// Mock lib helpers
-const chunkSpy = vi.fn((text, _opts) => ['c1', 'c2']);
-
-vi.mock('mcpland/lib', () => ({
-	chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
+	getSourceFolder: () => 'mcps',
+	isMcpToolEnabled: vi.fn(() => true),
 }));
 
 // Mock zod-to-json-schema
 vi.mock('zod-to-json-schema', () => ({
 	default: (schema: any) => ({ type: 'object' }),
-}));
-
-// Mock config
-vi.mock('../../../src/config', () => ({
-	getSourceFolder: () => 'mcps',
-	isMcpToolEnabled: vi.fn(() => true),
 }));
 
 class TestTool extends McpLandTool {
@@ -223,7 +216,14 @@ describe('McpLand base class', () => {
 
 	it('registerTool skips disabled tools', async () => {
 		// Mock isMcpToolEnabled to return false for this specific test
-		vi.doMock('../../../src/config', () => ({
+		vi.doMock('mcpland/lib', () => ({
+			chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
+			DB_PATH: '.data/context.sqlite',
+			SqliteEmbedStore: class MockStore {
+				constructor(_path: string) {}
+				ingest = ingestSpy;
+				search = searchSpy;
+			},
 			getSourceFolder: () => 'mcps',
 			isMcpToolEnabled: vi.fn((mcpName: string, toolName: string) => {
 				return toolName !== 'disabled'; // Return false for 'disabled' tool

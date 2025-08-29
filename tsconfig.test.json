@@ -3,11 +3,7 @@
   "compilerOptions": {
     "types": ["vitest/globals", "bun", "node"],
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-		"paths": {
-			"mcpland/core": ["./src/core/index.ts"],
-			"mcpland/lib": ["./src/lib/index.ts"]
-		}
+    "esModuleInterop": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]

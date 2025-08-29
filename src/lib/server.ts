@@ -1,3 +1,10 @@
+import {
+	McpRegistry,
+	type McpServerConfig,
+	type McpToolDefinition,
+} from 'mcpland/core';
+import { loadAvailableMcps, loadConfig } from 'mcpland/lib';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -7,7 +14,15 @@ import {
 	ServerResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { McpServerConfig, McpToolDefinition } from '../core/mcp';
+export async function startMcpServer(
+	config: McpServerConfig,
+	tools: McpToolDefinition[]
+) {
+	const server = createMcpServer(config, tools);
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
+	return server;
+}
 
 export function createMcpServer(
 	config: McpServerConfig,
@@ -72,12 +87,49 @@ export function createMcpServer(
 	return server;
 }
 
-export async function startMcpServer(
-	config: McpServerConfig,
-	tools: McpToolDefinition[]
-) {
-	const server = createMcpServer(config, tools);
-	const transport = new StdioServerTransport();
-	await server.connect(transport);
-	return server;
+export async function createMcpClient(): Promise<{
+	tools: McpToolDefinition[];
+}> {
+	console.warn('Creating MCP client');
+
+	// Aggregate tool definitions from all MCPs
+	const allToolDefs = McpRegistry.getAll().flatMap((entry) =>
+		entry.mcp.getTools()
+	);
+
+	// Start the MCP server and complete the stdio handshake
+	const cfg = loadConfig();
+	startMcpServer(
+		{
+			name: cfg.name ?? 'McpLand',
+			description: cfg.description ?? 'Aggregated MCP tools',
+		},
+		allToolDefs
+	);
+
+	// Initialize all MCPs and their tools using the registry
+	McpRegistry.initializeAll().catch((err) =>
+		console.error('MCP initialization failed:', err)
+	);
+
+	return {
+		tools: allToolDefs,
+	};
+}
+
+export async function stdio() {
+	console.warn('Starting MCP stdio');
+
+	await loadAvailableMcps();
+
+	return createMcpClient()
+		.then(({ tools }) => {
+			console.warn(`MCP server running on stdio with ${tools.length} tools`);
+			console.warn(JSON.stringify(tools, null, 2));
+			return { tools };
+		})
+		.catch((error) => {
+			console.error('Failed to start MCP server:', error);
+			process.exit(1);
+		});
 }

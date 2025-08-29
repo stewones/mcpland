@@ -1,12 +1,15 @@
 import z from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { chunkText } from 'mcpland/lib';
+import {
+	chunkText,
+	DB_PATH,
+	getSourceFolder,
+	isMcpToolEnabled,
+	SqliteEmbedStore,
+} from 'mcpland/lib';
 
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
-
-import { getSourceFolder, isMcpToolEnabled } from '../config';
-import { DB_PATH, SqliteEmbedStore } from '../store';
 
 export type JsonSchema = Record<string, any>;
 
@@ -52,22 +55,19 @@ export interface McpServerConfig {
 export abstract class McpLand<ExtendedTool extends McpLandTool = McpLandTool> {
 	public readonly spec: McpSpec;
 	protected readonly tools: ExtendedTool[] = [];
-	
+
 	constructor(spec: McpSpec) {
 		this.spec = spec;
 	}
 
-	protected registerTool(tool: ExtendedTool, discoveredToolId?: string): void {
+	public registerTool(tool: ExtendedTool, discoveredToolId?: string): void {
 		if (!tool?.spec) {
 			throw new Error('Tool is missing required config');
 		}
 		if (!tool.spec.name || tool.spec.name.trim().length === 0) {
 			throw new Error('Tool is missing required spec.name');
 		}
-		if (
-			!tool.spec.description ||
-			tool.spec.description.trim().length === 0
-		) {
+		if (!tool.spec.description || tool.spec.description.trim().length === 0) {
 			throw new Error('Tool is missing required spec.description');
 		}
 		// Compute MCP and tool identifiers if missing
@@ -154,7 +154,7 @@ export abstract class McpLandTool {
 		// Ensure sourceId is set
 		const sourceId = this.spec.sourceId ?? `${mcpId}-${toolId}-context`;
 		this.spec.sourceId = sourceId;
-		
+
 		await this.store.ingest(
 			{
 				id: sourceId,

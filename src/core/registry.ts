@@ -1,4 +1,4 @@
-import type { McpLand, McpToolDefinition } from './mcp';
+import type { McpLand, McpToolDefinition } from 'mcpland/core';
 
 export interface McpRegistryEntry {
 	mcp: McpLand;
@@ -20,13 +20,15 @@ export class McpRegistry {
 	}
 
 	static async initializeAll(): Promise<void> {
-		const promises = Array.from(McpRegistry.mcps.values()).map(async (entry) => {
-			if (!entry.initialized) {
-				await entry.mcp.init();
-				entry.initialized = true;
-				entry.initializedAt = new Date();
+		const promises = Array.from(McpRegistry.mcps.values()).map(
+			async (entry) => {
+				if (!entry.initialized) {
+					await entry.mcp.init();
+					entry.initialized = true;
+					entry.initializedAt = new Date();
+				}
 			}
-		});
+		);
 		await Promise.all(promises);
 	}
 
@@ -51,15 +53,19 @@ export class McpRegistry {
 	}
 
 	static getInitialized(): McpRegistryEntry[] {
-		return Array.from(McpRegistry.mcps.values()).filter(entry => entry.initialized);
+		return Array.from(McpRegistry.mcps.values()).filter(
+			(entry) => entry.initialized
+		);
 	}
 
 	static getUninitialized(): McpRegistryEntry[] {
-		return Array.from(McpRegistry.mcps.values()).filter(entry => !entry.initialized);
+		return Array.from(McpRegistry.mcps.values()).filter(
+			(entry) => !entry.initialized
+		);
 	}
 
 	static getAllTools(): McpToolDefinition[] {
-		return McpRegistry.getAll().flatMap(entry => entry.mcp.getTools());
+		return McpRegistry.getAll().flatMap((entry) => entry.mcp.getTools());
 	}
 
 	static clear(): void {
@@ -79,10 +85,12 @@ export class McpRegistry {
 			initialized: McpRegistry.getInitialized().length,
 			uninitialized: McpRegistry.getUninitialized().length,
 			mcpNames: McpRegistry.getNames(),
-			tools: McpRegistry.getInitialized().flatMap(entry => entry.mcp.getTools()).map(tool => ({
-				name: tool.name,
-				description: tool.description
-			}))
+			tools: McpRegistry.getInitialized()
+				.flatMap((entry) => entry.mcp.getTools())
+				.map((tool) => ({
+					name: tool.name,
+					description: tool.description,
+				})),
 		};
 	}
 
@@ -91,16 +99,16 @@ export class McpRegistry {
 	 */
 	static getToolsByMcp(mcpName: string) {
 		const entry = McpRegistry.get(mcpName);
-		
+
 		if (!entry) {
 			return null;
 		}
-		
+
 		return {
 			mcpName,
 			initialized: entry.initialized,
 			initializedAt: entry.initializedAt,
-			tools: entry.mcp.getTools()
+			tools: entry.mcp.getTools(),
 		};
 	}
 
@@ -109,7 +117,7 @@ export class McpRegistry {
 	 */
 	static isReady(mcpName: string): boolean {
 		const entry = McpRegistry.get(mcpName);
-		
+
 		return entry?.initialized ?? false;
 	}
 
@@ -117,12 +125,12 @@ export class McpRegistry {
 	 * Get initialization status of all MCPs
 	 */
 	static getStatuses() {
-		return McpRegistry.getAll().map(entry => ({
+		return McpRegistry.getAll().map((entry) => ({
 			name: entry.mcp.spec.name,
 			description: entry.mcp.spec.description,
 			initialized: entry.initialized,
 			initializedAt: entry.initializedAt,
-			toolCount: entry.mcp.getTools().length
+			toolCount: entry.mcp.getTools().length,
 		}));
 	}
 }
