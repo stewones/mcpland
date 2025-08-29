@@ -149,7 +149,7 @@ export class InitCommand extends McpLandCommand {
 				name: projName,
 				private: true,
 				type: 'module',
-				dependencies: { mcpland: 'latest' },
+				devDependencies: { mcpland: 'latest' },
 			};
 			writeFileSync(
 				path.join(projPath, 'package.json'),
@@ -163,12 +163,12 @@ export class InitCommand extends McpLandCommand {
 			try {
 				const pkgPath = path.join(targetRoot, 'package.json');
 				const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as any;
-				pkg.dependencies = pkg.dependencies || {};
-				if (pkg.dependencies['mcpland'] !== 'latest') {
-					pkg.dependencies['mcpland'] = 'latest';
+				pkg.devDependencies = pkg.devDependencies || {};
+				if (pkg.devDependencies['mcpland'] !== 'latest') {
+					pkg.devDependencies['mcpland'] = 'latest';
 					writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
 					log.step(
-						pc.cyan('Updated package.json: added mcpland@latest dependency')
+						pc.cyan('Updated package.json: added mcpland@latest dev dependency')
 					);
 				}
 			} catch (err) {

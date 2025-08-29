@@ -21,7 +21,9 @@ export async function loadAvailableMcps() {
 
 	console.warn('resolvedSourceDir', resolvedSourceDir);
 
-	const availableMcps = readdirSync(resolvedSourceDir);
+	const availableMcps = readdirSync(resolvedSourceDir).filter(
+		(file) => !file.includes('DS_Store')
+	);
 
 	console.warn('Loading available MCPs for', availableMcps);
 
