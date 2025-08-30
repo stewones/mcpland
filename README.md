@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/stewones-mcpland-badge.png)](https://mseep.ai/app/stewones-mcpland)
+
 # McpLand
 
 McpLand is a TypeScript framework for building and managing **Model Context Protocol (MCP) tools** with embedded context search capabilities. It provides a unified platform for creating AI-powered tools that can fetch, process, and search contextual information from various sources.
