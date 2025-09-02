@@ -1,6 +1,11 @@
-# McpLand
+# MCPLand
 
-McpLand is a TypeScript framework for building and managing **Model Context Protocol (MCP) tools** with embedded context search capabilities. It provides a unified platform for creating AI-powered tools that can fetch, process, and search contextual information from various sources.
+[![Tests](./assets/test.svg)](https://github.com/stewones/mcpland/tree/main/test/src)
+[![Coverage](./assets/coverage.svg)](https://app.codecov.io/github/stewones/mcpland)
+[![NPM Version](https://img.shields.io/npm/v/mcpland)](https://www.npmjs.com/package/mcpland)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/stewones/mcpland/blob/main/LICENSE)
+
+MCPLand is a TypeScript framework for building and managing **Model Context Protocol (MCP) tools** with embedded context search capabilities. It provides a unified platform for creating AI-powered tools that can fetch, process, and search contextual information from various sources.
 
 ## Content
 
@@ -147,7 +152,7 @@ mcp link --help             # Show help for link command
 
 # Available MCPs
 
-McpLand comes with built-in MCPs that you can use out of the box. These are automatically available during project initialization.
+MCPLand comes with built-in MCPs that you can use out of the box. These are automatically available during project initialization.
 
 ## Angular MCP
 
@@ -205,7 +210,7 @@ The Angular MCP provides access to Angular's official documentation and context 
 ## MCP Creation
 ```typescript
 // Create new MCP in src/mcps/your-mcp/
-class YourMCP extends McpLand {
+class YourMCP extends MCPLand {
   constructor() {
     super({ name: 'your-mcp', description: 'Your description' });
   }

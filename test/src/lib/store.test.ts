@@ -54,11 +54,16 @@ vi.mock('node:path', () => ({
   default: {
     dirname: (p: string) => p.split('/').slice(0, -1).join('/'),
     resolve: (...parts: string[]) => parts.join('/'),
+    join: (...parts: string[]) => parts.join('/'),
   },
   dirname: (p: string) => p.split('/').slice(0, -1).join('/'),
 }));
 vi.mock('node:url', () => ({
   fileURLToPath: (url: string) => url.replace('file://', ''),
+}));
+
+vi.mock('../../../src/lib/config', () => ({
+  getRootDir: vi.fn(() => '/test/root'),
 }));
 
 describe('SqliteEmbedStore behavior', () => {

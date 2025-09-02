@@ -1,0 +1,41 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: false
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  branches:
+    - "main"
+    - "develop"
+
+github_checks:
+  annotations: true
+
+ignore:
+  - "scripts/**"
+  - "test/**"
+  - "coverage/**"
+  - "dist/**"
+  - "node_modules/**"
+  - "src/mcps/**"  # Example MCPs, not core functionality
+  - "src/lib/log.ts"
+  - "src/lib/index.ts"   # Type barrel
+  - "src/core/index.ts"  # Type barrel
+
+flags:
+  unittests:
+    paths:
+      - src/
+    carryforward: true

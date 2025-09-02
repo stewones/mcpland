@@ -16,9 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --config=vitest.config.ts",
     "coverage": "bun run test:coverage && open coverage/index.html",
-    "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json"
+    "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json",
+    "badges": "bun run ./scripts/badges.ts"
   },
   "exports": {
     ".": {

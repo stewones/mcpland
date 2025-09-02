@@ -24,6 +24,7 @@ export default defineConfig({
       exclude: [
         'src/mcps/**',
         'scripts/**',
+        'src/lib/log.ts',
         // type barrels and trivial re-exports
         'src/core/index.ts',
         'src/lib/index.ts'

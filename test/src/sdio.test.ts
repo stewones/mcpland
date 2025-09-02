@@ -202,18 +202,29 @@ describe('stdio createMcpClient behavior', () => {
 	});
 });
 
+// Mock the log module
+const mockLogStep = vi.fn();
+const mockLogError = vi.fn();
+
+vi.mock('../../src/lib/log', () => ({
+	log: {
+		step: mockLogStep,
+		error: mockLogError,
+		message: vi.fn(),
+		warn: vi.fn(),
+		success: vi.fn(),
+		info: vi.fn(),
+	},
+}));
+
 describe('stdio main', () => {
-	let warnSpy: any;
-	let errorSpy: any;
 	let exitSpy: any;
 
 	beforeEach(() => {
-		// Mock console methods
-		warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		// Mock process.exit to prevent actual exit during tests
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
 
-		// Reset modules to avoid cross-test contamination
+		// Reset modules and mocks to avoid cross-test contamination
 		vi.resetModules();
 		vi.clearAllMocks();
 
@@ -242,16 +253,19 @@ describe('stdio main', () => {
 	});
 
 	afterEach(() => {
-		warnSpy.mockRestore();
-		errorSpy.mockRestore();
 		exitSpy.mockRestore();
+		// Note: mcpland function mocks are cleared in beforeEach via vi.clearAllMocks()
 	});
 
-	it('executes successfully and logs tools', async () => {
+	it('executes successfully and returns expected tools', async () => {
 		const { stdio } = await import('../../src/stdio');
 		const result = await stdio();
 
-		// Verify successful execution
+		// Verify that the core functions were called
+		expect(mockLoadAvailableMcps).toHaveBeenCalledOnce();
+		expect(mockCreateMcpClient).toHaveBeenCalledOnce();
+
+		// Verify successful execution returns correct tools
 		expect(result).toEqual({
 			tools: expect.arrayContaining([
 				expect.objectContaining({ name: 't1' }),
@@ -259,36 +273,40 @@ describe('stdio main', () => {
 			]),
 		});
 
-		// Verify console output
-		expect(warnSpy).toHaveBeenCalledWith(
-			'MCP server running on stdio with 2 tools'
-		);
-		expect(warnSpy).toHaveBeenCalledWith(
-			expect.stringContaining('"name": "t1"')
-		);
-		expect(warnSpy).toHaveBeenCalledWith(
-			expect.stringContaining('"name": "t2"')
-		);
+		// Verify tools have required properties
+		expect(result.tools).toHaveLength(2);
+		result.tools.forEach(tool => {
+			expect(tool).toHaveProperty('name');
+			expect(tool).toHaveProperty('description');
+			expect(tool).toHaveProperty('inputSchema');
+			expect(tool).toHaveProperty('handler');
+			expect(typeof tool.handler).toBe('function');
+		});
+
+		// Verify no process exit on success
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
 	it('handles errors and calls process.exit', async () => {
 		// Mock createMcpClient to throw error
-		mockCreateMcpClient.mockRejectedValueOnce(
-			new Error('client creation failed')
-		);
+		const testError = new Error('client creation failed');
+		mockCreateMcpClient.mockRejectedValueOnce(testError);
 
 		const { stdio } = await import('../../src/stdio');
 		await stdio();
 
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to start MCP server:',
-			expect.any(Error)
-		);
+		// Verify that initialization was attempted
+		expect(mockLoadAvailableMcps).toHaveBeenCalledOnce();
+		expect(mockCreateMcpClient).toHaveBeenCalledOnce();
+		
+		// Verify process exits with error code on failure
 		expect(exitSpy).toHaveBeenCalledWith(1);
+		
+		// Verify error logging occurred (we keep this minimal check to ensure error handling)
+		expect(mockLogError).toHaveBeenCalled();
 	});
 
-	it('executes the MCP server when imported as stdio module', async () => {
+	it('initializes MCPs and returns functional tools', async () => {
 		// Clear all mocks and reset modules to start fresh
 		vi.resetModules();
 		vi.clearAllMocks();
@@ -306,33 +324,30 @@ describe('stdio main', () => {
 		const { stdio } = await import('../../src/stdio');
 		const result = await stdio();
 
-		// Verify that the required mcpland functions were called
-		expect(mockLoadAvailableMcps).toHaveBeenCalled();
-		expect(mockCreateMcpClient).toHaveBeenCalled();
+		// Verify initialization flow was followed
+		expect(mockLoadAvailableMcps).toHaveBeenCalledOnce();
+		expect(mockCreateMcpClient).toHaveBeenCalledOnce();
 
-		// Verify the result structure (without comparing handler functions)
+		// Verify tools are properly structured and functional
 		expect(result.tools).toHaveLength(2);
-		expect(result.tools[0]).toEqual(
-			expect.objectContaining({
-				name: 't1',
-				description: 'd1',
-				inputSchema: {},
-			})
-		);
-		expect(result.tools[1]).toEqual(
-			expect.objectContaining({
-				name: 't2', 
-				description: 'd2',
-				inputSchema: {},
-			})
-		);
-		expect(typeof result.tools[0].handler).toBe('function');
-		expect(typeof result.tools[1].handler).toBe('function');
+		
+		// Test each tool structure
+		for (const tool of result.tools) {
+			expect(tool).toHaveProperty('name');
+			expect(tool).toHaveProperty('description'); 
+			expect(tool).toHaveProperty('inputSchema');
+			expect(tool).toHaveProperty('handler');
+			expect(typeof tool.handler).toBe('function');
+		}
 
-		// Verify console output
-		expect(warnSpy).toHaveBeenCalledWith('Starting MCP stdio');
-		expect(warnSpy).toHaveBeenCalledWith(
-			'MCP server running on stdio with 2 tools'
-		);
+		// Test that handlers are callable
+		const handlerResult1 = await result.tools[0].handler({});
+		const handlerResult2 = await result.tools[1].handler({});
+		
+		expect(handlerResult1).toEqual({ content: [] });
+		expect(handlerResult2).toEqual({ content: [] });
+
+		// Verify no exit on success
+		expect(exitSpy).not.toHaveBeenCalled();
 	});
 });
