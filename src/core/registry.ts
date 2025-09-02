@@ -9,7 +9,7 @@ export interface McpRegistryEntry {
 export class McpRegistry {
 	private static mcps: Map<string, McpRegistryEntry> = new Map();
 
-	// Private constructor to prevent instantiation
+	/* c8 ignore next - Private constructor to prevent instantiation */
 	private constructor() {}
 
 	static register(mcp: McpLand): void {

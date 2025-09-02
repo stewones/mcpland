@@ -42,7 +42,6 @@ describe('chunkText behavior', () => {
   });
 
   it('pushes current chunk before handling long line', () => {
-    // Test lines 20-22: pushing current before handling long line
     const input = 'short line\n' + 'x'.repeat(1500);
     const chunks = chunkText(input, { maxChars: 1000, overlap: 100 });
     
@@ -52,7 +51,6 @@ describe('chunkText behavior', () => {
   });
 
   it('handles zero overlap case', () => {
-    // Test lines 36-37: else branch when overlap is 0
     const lines = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n');
     const chunks = chunkText(lines, { maxChars: 30, overlap: 0 });
     

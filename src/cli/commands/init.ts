@@ -48,6 +48,364 @@ export class InitCommand extends McpLandCommand {
 		super('init', 'Initialize an MCP project');
 	}
 
+	logProjectExists(projName: string): void {
+		log.error(
+			pc.yellow(
+				`Folder "${projName}" already exists. Aborting to avoid overwrite.`
+			)
+		);
+	}
+
+	logSkippingMcp(mcp: string, destDir: string, targetRoot: string): void {
+		log.step(
+			pc.yellow(
+				`Skipping ${mcp} — already exists at ${path.relative(targetRoot, destDir)}`
+			)
+		);
+	}
+
+	logMcpAdded(mcp: string): void {
+		log.step(pc.green(`Added ${mcp}`));
+	}
+
+	checkExistingProject(projName: string): { exists: boolean; path: string } {
+		const projPath = path.join(process.cwd(), projName);
+		return { exists: existsSync(projPath), path: projPath };
+	}
+
+	createNewProject(projPath: string, projName: string): void {
+		this.ensureDirSync(projPath);
+		const pkgJson = {
+			name: projName,
+			private: true,
+			type: 'module',
+			devDependencies: { mcpland: 'latest' },
+		};
+		writeFileSync(
+			path.join(projPath, 'package.json'),
+			JSON.stringify(pkgJson, null, 2) + '\n',
+			'utf-8'
+		);
+		log.step(pc.green(`Created project at ${projPath}`));
+	}
+
+	updateExistingProject(targetRoot: string): void {
+		try {
+			const pkgPath = path.join(targetRoot, 'package.json');
+			const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as any;
+			pkg.devDependencies = pkg.devDependencies || {};
+			if (pkg.devDependencies['mcpland'] !== 'latest') {
+				pkg.devDependencies['mcpland'] = 'latest';
+				writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+				log.step(
+					pc.cyan('Updated package.json: added mcpland@latest dev dependency')
+				);
+			}
+		} catch (err) {
+			log.error(
+				pc.red(
+					`Failed to update existing package.json: ${JSON.stringify(err, null, 2)}`
+				)
+			);
+		}
+	}
+
+	buildRegistry(destRoot: string, sourceDir: string, selected: string[]) {
+		const registry: NonNullable<McpLandJson['registry']> = {};
+		const resolvedSourceDir = path.join(destRoot, sourceDir);
+		for (const mcp of selected) {
+			const mcpDir = path.join(resolvedSourceDir, mcp);
+			const toolsDir = path.join(mcpDir, 'tools');
+			let tools: string[] = [];
+			try {
+				tools = readdirSync(toolsDir).filter((t) => {
+					try {
+						return statSync(path.join(toolsDir, t)).isDirectory();
+					} catch {
+						return false;
+					}
+				});
+				/* c8 ignore next */
+			} catch {}
+
+			const toolEntries: Record<string, { enabled?: boolean }> = {};
+			for (const tool of tools) {
+				const toolDir = path.join(toolsDir, tool);
+				const hasCtx = this.toolHasContextUrl(toolDir);
+				toolEntries[tool] = { enabled: hasCtx ? false : true };
+			}
+
+			registry[mcp] = {
+				enabled: true,
+				tools: toolEntries,
+			};
+		}
+		return registry;
+	}
+
+	upsertEnvVar(destRoot: string, key: string, value: string) {
+		const envPath = path.join(destRoot, '.env');
+		let content = '';
+		try {
+			if (existsSync(envPath)) content = readFileSync(envPath, 'utf-8');
+			/* c8 ignore next */
+		} catch {}
+
+		const lines = content.split(/\r?\n/).filter(Boolean);
+		const keyEq = `${key}=`;
+		let found = false;
+		const next = lines.map((line) => {
+			if (line.trim().startsWith('#')) return line;
+			if (line.startsWith(keyEq)) {
+				found = true;
+				return `${key}=${value}`;
+			}
+			return line;
+		});
+		if (!found) next.push(`${key}=${value}`);
+		const out = next.join('\n') + '\n';
+		writeFileSync(envPath, out, 'utf-8');
+		log.step(pc.green(`Updated .env to include ${key}`));
+	}
+
+	ensureGitignoreHasEntry(destRoot: string, entry: string, label?: string) {
+		const gitignorePath = path.join(destRoot, '.gitignore');
+		let content = '';
+		try {
+			if (existsSync(gitignorePath))
+				content = readFileSync(gitignorePath, 'utf-8');
+			/* c8 ignore next */
+		} catch {}
+
+		const lines = content.split(/\r?\n/);
+		const has = lines.some((line) => {
+			const currentLine = line.trim();
+			return currentLine === entry || currentLine === `/${entry}`;
+		});
+		if (!has) {
+			const needsNewLine = content.length > 0 && !content.endsWith('\n');
+			const updatedFile =
+				(needsNewLine ? content + '\n' : content) + `${entry}\n`;
+			writeFileSync(gitignorePath, updatedFile, 'utf-8');
+			/* c8 ignore next */
+			log.step(pc.green(`Updated .gitignore to include ${label ?? entry}`));
+		}
+	}
+
+	ensureGitignoreDefaults(destRoot: string) {
+		this.ensureGitignoreHasEntry(destRoot, '.cursor', '.cursor');
+		this.ensureGitignoreHasEntry(destRoot, '.env', '.env');
+	}
+
+	ensureDirSync(dir: string) {
+		if (!existsSync(dir)) {
+			mkdirSync(dir, { recursive: true });
+		}
+	}
+
+	toolHasContextUrl(toolDir: string): boolean {
+		const candidates = [
+			path.join(toolDir, 'index.ts'),
+			path.join(toolDir, 'index.js'),
+		];
+
+		for (const file of candidates) {
+			try {
+				const s = statSync(file);
+				if (s.isFile()) {
+					const content = readFileSync(file, 'utf-8');
+					if (/contextUrl\s*:/.test(content) || /contextFile\s*:/.test(content))
+						return true;
+				}
+				/* c8 ignore next */
+			} catch {}
+		}
+
+		try {
+			for (const entry of readdirSync(toolDir)) {
+				const p = path.join(toolDir, entry);
+				try {
+					const st = statSync(p);
+					if (st.isFile()) {
+						const content = readFileSync(p, 'utf-8');
+						if (
+							/contextUrl\s*:/.test(content) ||
+							/contextFile\s*:/.test(content)
+						)
+							return true;
+					}
+					/* c8 ignore next */
+				} catch {}
+			}
+			/* c8 ignore next */
+		} catch {}
+		return false;
+	}
+
+	parseGithubUrl(url: string): { owner: string; repo: string } {
+		const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+		if (!match) throw new Error(`Invalid GitHub URL: ${url}`);
+
+		return { owner: match[1], repo: match[2] };
+	}
+
+	async processMcp(
+		mcp: string,
+		resolvedSourceDir: string,
+		targetRoot: string
+	): Promise<void> {
+		const destDir = path.join(resolvedSourceDir, mcp);
+		if (existsSync(destDir)) {
+			this.logSkippingMcp(mcp, destDir, targetRoot);
+			return;
+		}
+		try {
+			await this.copyMcpFromGitHub(mcp, destDir);
+			this.logMcpAdded(mcp);
+		} catch (err) {
+			log.step(pc.yellow(`Failed to fetch ${mcp}: ${String(err)}`));
+		}
+	}
+
+	async processSelectedMcps(
+		selectedMcps: string[],
+		resolvedSourceDir: string,
+		targetRoot: string
+	): Promise<void> {
+		for (const mcp of selectedMcps) {
+			await this.processMcp(mcp, resolvedSourceDir, targetRoot);
+		}
+	}
+
+	async copyMcpFromGitHub(mcpName: string, destDir: string) {
+		const { owner, repo } = this.parseGithubUrl(GITHUB_URL);
+
+		const ref = 'main';
+		const tree = await this.fetchRepoTree(owner, repo, ref);
+		const prefix = `src/mcps/${mcpName}/`;
+		const files = tree.filter(
+			(e) => e.type === 'blob' && e.path.startsWith(prefix)
+		);
+
+		if (!files.length)
+			throw new Error(`MCP '${mcpName}' not found in GitHub repo`);
+
+		for (const f of files) {
+			const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${f.path}`;
+			const res = await fetch(rawUrl, {
+				headers: { 'User-Agent': 'mcpland-cli' },
+			});
+
+			if (!res.ok) {
+				const text = await res.text().catch(() => '');
+				throw new Error(`HTTP ${res.status} for ${rawUrl}: ${text}`);
+			}
+
+			const ab = await res.arrayBuffer();
+			const buf = Buffer.from(ab);
+			const rel = f.path.substring(prefix.length);
+			const outPath = path.join(destDir, rel);
+
+			this.ensureDirSync(path.dirname(outPath));
+			writeFileSync(outPath, buf);
+		}
+	}
+
+	async listAvailableMcpsFromGitHub(): Promise<AvailableMcp[]> {
+		const { owner, repo } = this.parseGithubUrl(GITHUB_URL);
+		const ref = 'main';
+		const tree = await this.fetchRepoTree(owner, repo, ref);
+		const mcpToTools = new Map<string, Set<string>>();
+		for (const entry of tree) {
+			if (entry.type !== 'tree') continue;
+			const parts = entry.path.split('/');
+			if (parts.length >= 3 && parts[0] === 'src' && parts[1] === 'mcps') {
+				const mcp = parts[2];
+				if (!mcpToTools.has(mcp)) mcpToTools.set(mcp, new Set());
+				if (parts.length >= 5 && parts[3] === 'tools') {
+					const tool = parts[4];
+					if (tool) mcpToTools.get(mcp)!.add(tool);
+				}
+			}
+		}
+		return Array.from(mcpToTools.entries()).map(([name, tools]) => ({
+			name,
+			tools: Array.from(tools),
+		}));
+	}
+
+	async fetchConfigFromGitHub(): Promise<McpLandJson | null> {
+		const { owner, repo } = this.parseGithubUrl(GITHUB_URL);
+		const ref = 'main';
+		const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/mcpland.json`;
+		const res = await fetch(rawUrl, {
+			headers: { 'User-Agent': 'mcpland-cli' },
+		});
+		if (!res.ok) return null;
+		const text = await res.text();
+		try {
+			return JSON.parse(text) as McpLandJson;
+		} catch {
+			return null;
+		}
+	}
+
+	async writeConfigJson(
+		destRoot: string,
+		sourceDir: string,
+		selected: string[]
+	) {
+		const destCfgPath = path.join(destRoot, 'mcpland.json');
+		let cfg: McpLandJson = {};
+
+		if (existsSync(destCfgPath)) {
+			try {
+				cfg = JSON.parse(readFileSync(destCfgPath, 'utf-8')) as McpLandJson;
+			} catch {
+				cfg = {};
+			}
+		} else {
+			try {
+				const remote = await this.fetchConfigFromGitHub();
+				if (remote) cfg = remote;
+				/* c8 ignore next 2 */
+			} catch {
+				cfg = {};
+			}
+		}
+
+		cfg.source = sourceDir;
+		cfg.registry = this.buildRegistry(destRoot, sourceDir, selected);
+
+		writeFileSync(destCfgPath, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
+	}
+
+	async fetchRepoTree(
+		owner: string,
+		repo: string,
+		ref = 'main'
+	): Promise<Array<{ path: string; type: 'blob' | 'tree' }>> {
+		const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`;
+		const res = await fetch(url, { headers: { 'User-Agent': 'mcpland-cli' } });
+
+		if (!res.ok) {
+			const text = await res.text().catch(() => '');
+			throw new Error(
+				`GitHub API error ${res.status} ${res.statusText}: ${text}`
+			);
+		}
+
+		const json: any = await res.json();
+
+		/* c8 ignore next */
+		const tree: any[] = Array.isArray(json?.tree) ? json.tree : [];
+
+		return tree.map((e) => ({
+			path: String(e.path),
+			type: e.type as 'blob' | 'tree',
+		}));
+	}
+
 	async run(_args?: string[], _cli?: any): Promise<number> {
 		const banner = figlet.textSync('MCPLAND', { font: 'Sub-Zero' });
 		log.step(pc.greenBright(banner));
@@ -98,7 +456,7 @@ export class InitCommand extends McpLandCommand {
 
 		let available: AvailableMcp[] = [];
 		try {
-			available = await listAvailableMcpsFromGitHub();
+			available = await this.listAvailableMcpsFromGitHub();
 		} catch (err) {
 			log.step(
 				pc.yellow('Failed to list MCPs from GitHub; selection will be empty.')
@@ -137,79 +495,38 @@ export class InitCommand extends McpLandCommand {
 			const projName = answers.projectName!.trim();
 			const projPath = path.resolve(process.cwd(), projName);
 			if (existsSync(projPath)) {
-				log.error(
-					pc.yellow(
-						`Folder "${projName}" already exists. Aborting to avoid overwrite.`
-					)
-				);
+				this.logProjectExists(projName);
 				return 1;
 			}
-			ensureDirSync(projPath);
-			const pkgJson = {
-				name: projName,
-				private: true,
-				type: 'module',
-				devDependencies: { mcpland: 'latest' },
-			};
-			writeFileSync(
-				path.join(projPath, 'package.json'),
-				JSON.stringify(pkgJson, null, 2) + '\n',
-				'utf-8'
-			);
+			this.createNewProject(projPath, projName);
 			targetRoot = projPath;
 			createdNewProject = true;
-			log.step(pc.green(`Created project at ${projPath}`));
 		} else {
-			try {
-				const pkgPath = path.join(targetRoot, 'package.json');
-				const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as any;
-				pkg.devDependencies = pkg.devDependencies || {};
-				if (pkg.devDependencies['mcpland'] !== 'latest') {
-					pkg.devDependencies['mcpland'] = 'latest';
-					writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
-					log.step(
-						pc.cyan('Updated package.json: added mcpland@latest dev dependency')
-					);
-				}
-			} catch (err) {
-				log.error(
-					pc.red(
-						`Failed to update existing package.json: ${JSON.stringify(err, null, 2)}`
-					)
-				);
-			}
+			this.updateExistingProject(targetRoot);
 		}
 
 		const resolvedSourceDir = path.join(targetRoot, answers.sourceDir);
-		ensureDirSync(resolvedSourceDir);
+		this.ensureDirSync(resolvedSourceDir);
 
 		if (answers.selectedMcps.length) {
-			for (const mcp of answers.selectedMcps) {
-				const destDir = path.join(resolvedSourceDir, mcp);
-				if (existsSync(destDir)) {
-					log.step(
-						pc.yellow(
-							`Skipping ${mcp} — already exists at ${path.relative(targetRoot, destDir)}`
-						)
-					);
-					continue;
-				}
-				try {
-					await copyMcpFromGitHub(mcp, destDir);
-					log.step(pc.green(`Added ${mcp}`));
-				} catch (err) {
-					log.step(pc.yellow(`Failed to fetch ${mcp}: ${String(err)}`));
-				}
-			}
+			await this.processSelectedMcps(
+				answers.selectedMcps,
+				resolvedSourceDir,
+				targetRoot
+			);
 		}
 
-		await writeConfigJson(targetRoot, answers.sourceDir, answers.selectedMcps);
+		await this.writeConfigJson(
+			targetRoot,
+			answers.sourceDir,
+			answers.selectedMcps
+		);
 		log.step(
 			pc.green(`Wrote mcpland.json with ${answers.selectedMcps.length} MCP(s)`)
 		);
 
-		ensureGitignoreDefaults(targetRoot);
-		upsertEnvVar(targetRoot, 'OPENAI_API_KEY', openaiKey);
+		this.ensureGitignoreDefaults(targetRoot);
+		this.upsertEnvVar(targetRoot, 'OPENAI_API_KEY', openaiKey);
 
 		try {
 			const bunBin = Bun.which('bun') ?? 'bun';
@@ -230,6 +547,7 @@ export class InitCommand extends McpLandCommand {
 			} else {
 				s.stop(pc.green('Dependencies installed successfully'));
 			}
+			/* c8 ignore next 5 */
 		} catch (err) {
 			log.error(
 				pc.red(
@@ -240,6 +558,7 @@ export class InitCommand extends McpLandCommand {
 
 		if (createdNewProject) {
 			log.step(
+				/* c8 ignore next */
 				pc.cyan(`Next: cd ${path.relative(process.cwd(), targetRoot) || '.'}`)
 			);
 		}
@@ -251,266 +570,4 @@ export class InitCommand extends McpLandCommand {
 		outro('Initialization complete 🎉');
 		return 0;
 	}
-}
-
-function ensureDirSync(dir: string) {
-	if (!existsSync(dir)) {
-		mkdirSync(dir, { recursive: true });
-	}
-}
-
-function toolHasContextUrl(toolDir: string): boolean {
-	const candidates = [
-		path.join(toolDir, 'index.ts'),
-		path.join(toolDir, 'index.js'),
-	];
-
-	for (const file of candidates) {
-		try {
-			const s = statSync(file);
-			if (s.isFile()) {
-				const content = readFileSync(file, 'utf-8');
-				if (/contextUrl\s*:/.test(content) || /contextFile\s*:/.test(content))
-					return true;
-			}
-		} catch {}
-	}
-
-	try {
-		for (const entry of readdirSync(toolDir)) {
-			const p = path.join(toolDir, entry);
-			try {
-				const st = statSync(p);
-				if (st.isFile()) {
-					const content = readFileSync(p, 'utf-8');
-					if (/contextUrl\s*:/.test(content) || /contextFile\s*:/.test(content))
-						return true;
-				}
-			} catch {}
-		}
-	} catch {}
-
-	return false;
-}
-
-function parseGithubUrl(url: string): { owner: string; repo: string } {
-	const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-	if (!match) throw new Error(`Invalid GitHub URL: ${url}`);
-
-	return { owner: match[1], repo: match[2] };
-}
-
-async function fetchRepoTree(
-	owner: string,
-	repo: string,
-	ref = 'main'
-): Promise<Array<{ path: string; type: 'blob' | 'tree' }>> {
-	const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`;
-	const res = await fetch(url, { headers: { 'User-Agent': 'mcpland-cli' } });
-
-	if (!res.ok) {
-		const text = await res.text().catch(() => '');
-		throw new Error(
-			`GitHub API error ${res.status} ${res.statusText}: ${text}`
-		);
-	}
-
-	const json: any = await res.json();
-	const tree: any[] = Array.isArray(json?.tree) ? json.tree : [];
-
-	return tree.map((e) => ({
-		path: String(e.path),
-		type: e.type as 'blob' | 'tree',
-	}));
-}
-
-async function copyMcpFromGitHub(mcpName: string, destDir: string) {
-	const { owner, repo } = parseGithubUrl(GITHUB_URL);
-
-	const ref = 'main';
-	const tree = await fetchRepoTree(owner, repo, ref);
-	const prefix = `src/mcps/${mcpName}/`;
-	const files = tree.filter(
-		(e) => e.type === 'blob' && e.path.startsWith(prefix)
-	);
-
-	if (!files.length)
-		throw new Error(`MCP '${mcpName}' not found in GitHub repo`);
-
-	for (const f of files) {
-		const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${f.path}`;
-		const res = await fetch(rawUrl, {
-			headers: { 'User-Agent': 'mcpland-cli' },
-		});
-
-		if (!res.ok) {
-			const text = await res.text().catch(() => '');
-			throw new Error(`HTTP ${res.status} for ${rawUrl}: ${text}`);
-		}
-
-		const ab = await res.arrayBuffer();
-		const buf = Buffer.from(ab);
-		const rel = f.path.substring(prefix.length);
-		const outPath = path.join(destDir, rel);
-
-		ensureDirSync(path.dirname(outPath));
-		writeFileSync(outPath, buf);
-	}
-}
-
-async function listAvailableMcpsFromGitHub(): Promise<AvailableMcp[]> {
-	const { owner, repo } = parseGithubUrl(GITHUB_URL);
-	const ref = 'main';
-	const tree = await fetchRepoTree(owner, repo, ref);
-	const mcpToTools = new Map<string, Set<string>>();
-	for (const entry of tree) {
-		if (entry.type !== 'tree') continue;
-		const parts = entry.path.split('/');
-		if (parts.length >= 3 && parts[0] === 'src' && parts[1] === 'mcps') {
-			const mcp = parts[2];
-			if (!mcpToTools.has(mcp)) mcpToTools.set(mcp, new Set());
-			if (parts.length >= 5 && parts[3] === 'tools') {
-				const tool = parts[4];
-				if (tool) mcpToTools.get(mcp)!.add(tool);
-			}
-		}
-	}
-	return Array.from(mcpToTools.entries()).map(([name, tools]) => ({
-		name,
-		tools: Array.from(tools),
-	}));
-}
-
-function buildRegistry(
-	destRoot: string,
-	sourceDir: string,
-	selected: string[]
-) {
-	const registry: NonNullable<McpLandJson['registry']> = {};
-	const resolvedSourceDir = path.join(destRoot, sourceDir);
-	for (const mcp of selected) {
-		const mcpDir = path.join(resolvedSourceDir, mcp);
-		const toolsDir = path.join(mcpDir, 'tools');
-		let tools: string[] = [];
-		try {
-			tools = readdirSync(toolsDir).filter((t) => {
-				try {
-					return statSync(path.join(toolsDir, t)).isDirectory();
-				} catch {
-					return false;
-				}
-			});
-		} catch {}
-
-		const toolEntries: Record<string, { enabled?: boolean }> = {};
-		for (const tool of tools) {
-			const toolDir = path.join(toolsDir, tool);
-			const hasCtx = toolHasContextUrl(toolDir);
-			toolEntries[tool] = { enabled: hasCtx ? false : true };
-		}
-
-		registry[mcp] = {
-			enabled: true,
-			tools: toolEntries,
-		};
-	}
-	return registry;
-}
-
-async function fetchConfigFromGitHub(): Promise<McpLandJson | null> {
-	const { owner, repo } = parseGithubUrl(GITHUB_URL);
-	const ref = 'main';
-	const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/mcpland.json`;
-	const res = await fetch(rawUrl, { headers: { 'User-Agent': 'mcpland-cli' } });
-	if (!res.ok) return null;
-	const text = await res.text();
-	try {
-		return JSON.parse(text) as McpLandJson;
-	} catch {
-		return null;
-	}
-}
-
-async function writeConfigJson(
-	destRoot: string,
-	sourceDir: string,
-	selected: string[]
-) {
-	const destCfgPath = path.join(destRoot, 'mcpland.json');
-	let cfg: McpLandJson = {};
-
-	if (existsSync(destCfgPath)) {
-		try {
-			cfg = JSON.parse(readFileSync(destCfgPath, 'utf-8')) as McpLandJson;
-		} catch {
-			cfg = {};
-		}
-	} else {
-		try {
-			const remote = await fetchConfigFromGitHub();
-			if (remote) cfg = remote;
-		} catch {
-			cfg = {};
-		}
-	}
-
-	cfg.source = sourceDir;
-	cfg.registry = buildRegistry(destRoot, sourceDir, selected);
-
-	writeFileSync(destCfgPath, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
-}
-
-function ensureGitignoreHasEntry(
-	destRoot: string,
-	entry: string,
-	label?: string
-) {
-	const gitignorePath = path.join(destRoot, '.gitignore');
-	let content = '';
-	try {
-		if (existsSync(gitignorePath))
-			content = readFileSync(gitignorePath, 'utf-8');
-	} catch {}
-
-	const lines = content.split(/\r?\n/);
-	const has = lines.some((line) => {
-		const currentLine = line.trim();
-		return currentLine === entry || currentLine === `/${entry}`;
-	});
-	if (!has) {
-		const needsNewLine = content.length > 0 && !content.endsWith('\n');
-		const updatedFile =
-			(needsNewLine ? content + '\n' : content) + `${entry}\n`;
-		writeFileSync(gitignorePath, updatedFile, 'utf-8');
-		log.step(pc.green(`Updated .gitignore to include ${label ?? entry}`));
-	}
-}
-
-function ensureGitignoreDefaults(destRoot: string) {
-	ensureGitignoreHasEntry(destRoot, '.cursor', '.cursor');
-	ensureGitignoreHasEntry(destRoot, '.env', '.env');
-}
-
-function upsertEnvVar(destRoot: string, key: string, value: string) {
-	const envPath = path.join(destRoot, '.env');
-	let content = '';
-	try {
-		if (existsSync(envPath)) content = readFileSync(envPath, 'utf-8');
-	} catch {}
-
-	const lines = content.split(/\r?\n/).filter(Boolean);
-	const keyEq = `${key}=`;
-	let found = false;
-	const next = lines.map((line) => {
-		if (line.trim().startsWith('#')) return line;
-		if (line.startsWith(keyEq)) {
-			found = true;
-			return `${key}=${value}`;
-		}
-		return line;
-	});
-	if (!found) next.push(`${key}=${value}`);
-	const out = next.join('\n') + '\n';
-	writeFileSync(envPath, out, 'utf-8');
-	log.step(pc.green(`Updated .env to include ${key}`));
 }

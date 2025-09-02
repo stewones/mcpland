@@ -147,3 +147,128 @@ describe('startMcpServer behavior', () => {
 		);
 	});
 });
+
+describe('createMcpClient behavior', () => {
+	let mockStep: any;
+	let mockError: any;
+	let mockStartMcpServer: any;
+
+	beforeEach(() => {
+		vi.resetModules();
+		mockStep = vi.fn();
+		mockError = vi.fn();
+		mockStartMcpServer = vi.fn().mockResolvedValue({});
+		
+		vi.doMock('../../../src/lib/log', () => ({
+			log: {
+				step: mockStep,
+				error: mockError
+			}
+		}));
+		
+		// Mock the startMcpServer function
+		vi.doMock('../../../src/lib/server', async () => {
+			const actual = await vi.importActual('../../../src/lib/server') as any;
+			return {
+				...actual,
+				startMcpServer: mockStartMcpServer
+			};
+		});
+	});
+
+	it('creates MCP client and starts server with aggregated tools', async () => {
+		const mockLoadConfig = vi.fn(() => ({ 
+			name: 'TestMCP', 
+			description: 'Test Description' 
+		}));
+		
+		const mockGetAll = vi.fn(() => [
+			{
+				mcp: {
+					getTools: () => [
+						{ name: 'tool1', description: 'desc1', inputSchema: {}, handler: () => {} },
+						{ name: 'tool2', description: 'desc2', inputSchema: {}, handler: () => {} }
+					]
+				}
+			}
+		]);
+
+		const mockInitializeAll = vi.fn().mockResolvedValue(undefined);
+
+		vi.doMock('mcpland', () => ({
+			loadConfig: mockLoadConfig,
+			McpRegistry: {
+				getAll: mockGetAll,
+				initializeAll: mockInitializeAll
+			}
+		}));
+
+		const { createMcpClient } = await import('../../../src/lib/server');
+
+		const result = await createMcpClient();
+
+		expect(mockStep).toHaveBeenCalledWith('Creating MCP client');
+		expect(mockInitializeAll).toHaveBeenCalled();
+		expect(result.tools).toHaveLength(2);
+	});
+
+	it('handles MCP initialization errors gracefully', async () => {
+		const mockLoadConfig = vi.fn(() => ({ name: 'TestMCP' }));
+		
+		const mockGetAll = vi.fn(() => [
+			{
+				mcp: {
+					getTools: () => [{ name: 'tool1', description: 'desc1', inputSchema: {}, handler: () => {} }]
+				}
+			}
+		]);
+
+		const mockInitializeAll = vi.fn().mockRejectedValue(new Error('Init failed'));
+
+		vi.doMock('mcpland', () => ({
+			loadConfig: mockLoadConfig,
+			McpRegistry: {
+				getAll: mockGetAll,
+				initializeAll: mockInitializeAll
+			}
+		}));
+
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const { createMcpClient } = await import('../../../src/lib/server');
+
+		const result = await createMcpClient();
+
+		// Should still return tools even if initialization fails
+		expect(result.tools).toHaveLength(1);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			'MCP initialization failed:',
+			expect.any(Error)
+		);
+
+		consoleErrorSpy.mockRestore();
+	});
+
+	it('uses default names when config is incomplete', async () => {
+		const mockLoadConfig = vi.fn(() => ({})); // Empty config
+		
+		const mockGetAll = vi.fn(() => []);
+		const mockInitializeAll = vi.fn().mockResolvedValue(undefined);
+
+		vi.doMock('mcpland', () => ({
+			loadConfig: mockLoadConfig,
+			McpRegistry: {
+				getAll: mockGetAll,
+				initializeAll: mockInitializeAll
+			}
+		}));
+
+		const { createMcpClient } = await import('../../../src/lib/server');
+
+		const result = await createMcpClient();
+
+		// Just verify the function runs and returns expected structure
+		expect(result).toBeDefined();
+		expect(result.tools).toEqual([]);
+	});
+});

@@ -11,18 +11,18 @@ import { McpLandCommand } from '../command';
 export class ServeCommand extends McpLandCommand {
 	constructor() {
 		super('serve', 'Start MCPLand SSE server');
-		
+
 		// Define options for this command
 		this.defineOption({
 			name: 'port',
 			alias: 'p',
 			type: 'number',
 			description: 'Port to run the SSE server on',
-			default: 1337
+			default: 1337,
 		});
 	}
 
-	async run(args: string[], _cli: any): Promise<number> {
+	async run(args: string[], _cli: any = {}): Promise<number> {
 		const banner = figlet.textSync('MCPLAND', { font: 'Sub-Zero' });
 		log.step(pc.greenBright(banner));
 

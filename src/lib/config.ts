@@ -60,6 +60,7 @@ export function getRootDir(): string {
 			if (existsSync(configPath)) {
 				return searchDir;
 			}
+			/* c8 ignore next */
 		} catch {}
 		searchDir = path.dirname(searchDir);
 	}

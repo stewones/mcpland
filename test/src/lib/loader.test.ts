@@ -118,4 +118,160 @@ describe('loader behavior', () => {
       'MCP at "src/mcps/bad-mcp" is missing required config.name'
     );
   });
+
+  it('handles tool modules with missing default export', async () => {
+    mockReaddirSync.mockReturnValueOnce(['angular'])
+                   .mockReturnValueOnce(['docs']);
+
+    const mockMcp = {
+      default: {
+        spec: { name: 'angular' },
+        registerTool: vi.fn(),
+      },
+    };
+    
+    const mockTool = { default: null }; // null default export (falsy)
+
+    vi.doMock('/test/root/src/mcps/angular', () => mockMcp);
+    vi.doMock('/test/root/src/mcps/angular/tools/docs', () => mockTool);
+    
+    const mockLog = { 
+      error: vi.fn(), 
+      message: vi.fn(), 
+      step: vi.fn(), 
+      warn: vi.fn(),
+      success: vi.fn(),
+      info: vi.fn()
+    };
+    vi.doMock('../../../src/lib/log', () => ({ log: mockLog }));
+    
+    const { loadAvailableMcps } = await import('../../../src/lib/loader');
+    
+    await loadAvailableMcps();
+
+    expect(mockLog.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to load tools for MCP angular')
+    );
+  });
+
+  it('handles tool registration errors', async () => {
+    mockReaddirSync.mockReturnValueOnce(['angular'])
+                   .mockReturnValueOnce(['docs']);
+
+    const mockMcp = {
+      default: {
+        spec: { name: 'angular' },
+        registerTool: vi.fn().mockImplementation(() => {
+          throw new Error('Registration failed');
+        }),
+      },
+    };
+    
+    const mockTool = {
+      default: class MockTool {},
+    };
+
+    vi.doMock('/test/root/src/mcps/angular', () => mockMcp);
+    vi.doMock('/test/root/src/mcps/angular/tools/docs', () => mockTool);
+    
+    const mockLog = { 
+      error: vi.fn(), 
+      message: vi.fn(), 
+      step: vi.fn(), 
+      warn: vi.fn(),
+      success: vi.fn(),
+      info: vi.fn()
+    };
+    vi.doMock('../../../src/lib/log', () => ({ log: mockLog }));
+    
+    const { loadAvailableMcps } = await import('../../../src/lib/loader');
+    
+    await loadAvailableMcps();
+
+    expect(mockLog.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to load tools for MCP angular')
+    );
+  });
+
+  it('handles tool instantiation where default is already an instance', async () => {
+    mockReaddirSync.mockReturnValueOnce(['angular'])
+                   .mockReturnValueOnce(['docs']);
+
+    const mockMcp = {
+      default: {
+        spec: { name: 'angular' },
+        registerTool: vi.fn(),
+      },
+    };
+    
+    const mockToolInstance = { some: 'tool', instance: true };
+    const mockTool = {
+      default: mockToolInstance, // Not a function, already an instance
+    };
+
+    vi.doMock('/test/root/src/mcps/angular', () => mockMcp);
+    vi.doMock('/test/root/src/mcps/angular/tools/docs', () => mockTool);
+    
+    const { loadAvailableMcps } = await import('../../../src/lib/loader');
+    
+    await loadAvailableMcps();
+
+    expect(mockMcp.default.registerTool).toHaveBeenCalledWith(mockToolInstance);
+  });
+
+  it('skips tools that are disabled by config', async () => {
+    mockReaddirSync.mockReturnValueOnce(['angular'])
+                   .mockReturnValueOnce(['docs', 'disabled-tool']);
+    
+    // Enable MCP but disable specific tool
+    mockIsMcpEnabled.mockReturnValue(true);
+    mockIsMcpToolEnabled.mockImplementation((mcpName: string, toolName: string) => {
+      return toolName !== 'disabled-tool';
+    });
+
+    const mockMcp = {
+      default: {
+        spec: { name: 'angular' },
+        registerTool: vi.fn(),
+      },
+    };
+    
+    const mockTool1 = { default: class MockTool {} };
+    const mockTool2 = { default: class MockDisabledTool {} };
+
+    vi.doMock('/test/root/src/mcps/angular', () => mockMcp);
+    vi.doMock('/test/root/src/mcps/angular/tools/docs', () => mockTool1);
+    vi.doMock('/test/root/src/mcps/angular/tools/disabled-tool', () => mockTool2);
+    
+    const { loadAvailableMcps } = await import('../../../src/lib/loader');
+    
+    await loadAvailableMcps();
+
+    // Should register the enabled tool but skip the disabled one
+    expect(mockMcp.default.registerTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters out non-directory entries from tools scanning', async () => {
+    mockReaddirSync.mockReturnValueOnce(['angular'])
+                   .mockReturnValueOnce(['docs', 'readme.md', 'config.ts']); // Mix of dirs and files
+
+    const mockMcp = {
+      default: {
+        spec: { name: 'angular' },
+        registerTool: vi.fn(),
+      },
+    };
+    
+    const mockTool = { default: class MockTool {} };
+
+    vi.doMock('/test/root/src/mcps/angular', () => mockMcp);
+    vi.doMock('/test/root/src/mcps/angular/tools/docs', () => mockTool);
+    
+    const { loadAvailableMcps } = await import('../../../src/lib/loader');
+    
+    await loadAvailableMcps();
+
+    // Should only process 'docs' directory, skipping .md and .ts files
+    expect(mockMcp.default.registerTool).toHaveBeenCalledTimes(1);
+  });
 });

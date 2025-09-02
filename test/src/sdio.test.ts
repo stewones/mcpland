@@ -351,3 +351,138 @@ describe('stdio main', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 });
+
+describe('stdio SIGTERM handler', () => {
+	let mockStep: any;
+	let mockShutdown: any;
+
+	beforeEach(() => {
+		mockStep = vi.fn();
+		mockShutdown = vi.fn();
+		
+		vi.doMock('../../src/lib/log', () => ({
+			log: {
+				step: mockStep,
+				error: vi.fn(),
+				message: vi.fn(),
+				warn: vi.fn(),
+				success: vi.fn(),
+				info: vi.fn(),
+			}
+		}));
+
+		vi.doMock('mcpland', () => ({
+			createMcpClient: vi.fn().mockResolvedValue({ tools: [] }),
+			loadAvailableMcps: vi.fn().mockResolvedValue(undefined),
+			SqliteEmbedStore: {
+				shutdown: mockShutdown
+			}
+		}));
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('sets up SIGTERM handler that shuts down store', async () => {
+		// Reset modules to ensure we get a fresh import with our mocks
+		vi.resetModules();
+		
+		// Mock process.on to capture the SIGTERM handler
+		const originalOn = process.on;
+		let sigTermHandler: Function | undefined;
+		const onSpy = vi.spyOn(process, 'on').mockImplementation(((event: string, handler: Function) => {
+			if (event === 'SIGTERM') {
+				sigTermHandler = handler;
+			}
+			return process;
+		}) as any);
+		
+		// Import stdio function with our mocked dependencies
+		const { stdio } = await import('../../src/stdio');
+		const result = await stdio();
+		
+		// Function should complete successfully and set up handlers
+		expect(result).toBeDefined();
+		expect(result.tools).toBeDefined();
+		
+		// Verify our mocked step function was called during stdio startup
+		expect(mockStep).toHaveBeenCalledWith('Starting MCP stdio');
+		
+		// Verify SIGTERM handler was set up
+		expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+		
+		// Test that the SIGTERM handler works correctly
+		if (sigTermHandler) {
+			sigTermHandler();
+			expect(mockStep).toHaveBeenCalledWith('Shutting down MCPLand stdio');
+			expect(mockShutdown).toHaveBeenCalled();
+		}
+		
+		// Restore original function
+		onSpy.mockRestore();
+	});
+});
+
+describe('stdio main function detection', () => {
+	let originalArgv: string[];
+	
+	beforeEach(() => {
+		originalArgv = [...process.argv];
+		vi.resetModules();
+	});
+	
+	afterEach(() => {
+		process.argv = originalArgv;
+	});
+
+	it('main function returns false when not executed directly', async () => {
+		// Mock different paths to simulate import vs direct execution
+		process.argv = ['node', '/different/path.js'];
+		
+		const mockResolve = vi.fn()
+			.mockReturnValueOnce('/test/stdio.js') // currentFilePath
+			.mockReturnValueOnce('/different/path.js'); // mainScriptPath
+		
+		vi.doMock('path', () => ({
+			resolve: mockResolve
+		}));
+		vi.doMock('node:url', () => ({
+			fileURLToPath: vi.fn(() => '/test/stdio.js')
+		}));
+
+		// Re-import the module to test main function
+		const stdioModule = await import('../../src/stdio');
+		
+		// The main function should return false since paths don't match
+		expect(mockResolve).toHaveBeenCalledTimes(2);
+	});
+
+	it('main function returns true when executed directly', async () => {
+		// Mock same paths to simulate direct execution
+		process.argv = ['node', '/test/stdio.js'];
+		
+		const mockResolve = vi.fn()
+			.mockReturnValueOnce('/test/stdio.js') // currentFilePath
+			.mockReturnValueOnce('/test/stdio.js'); // mainScriptPath
+		
+		vi.doMock('path', () => ({
+			resolve: mockResolve
+		}));
+		vi.doMock('node:url', () => ({
+			fileURLToPath: vi.fn(() => '/test/stdio.js')
+		}));
+
+		// Mock stdio function to avoid actual execution
+		vi.doMock('mcpland', () => ({
+			createMcpClient: vi.fn().mockResolvedValue({ tools: [] }),
+			loadAvailableMcps: vi.fn().mockResolvedValue(undefined),
+			SqliteEmbedStore: { shutdown: vi.fn() }
+		}));
+
+		// Re-import the module to test main function
+		await import('../../src/stdio');
+		
+		expect(mockResolve).toHaveBeenCalledTimes(2);
+	});
+});

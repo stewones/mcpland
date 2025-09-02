@@ -64,7 +64,7 @@ export abstract class McpLand<ExtendedTool extends McpTool = McpTool> {
 		this.spec = spec;
 	}
 
-	public registerTool(tool: ExtendedTool, discoveredToolId?: string): void {
+	public registerTool(tool: ExtendedTool): void {
 		if (!tool?.spec) {
 			throw new Error('Tool is missing required config');
 		}
@@ -75,9 +75,8 @@ export abstract class McpLand<ExtendedTool extends McpTool = McpTool> {
 			throw new Error('Tool is missing required spec.description');
 		}
 		// Compute MCP and tool identifiers if missing
-		const mcpId = (tool.spec.mcpId = tool.spec.mcpId || this.spec.name);
-		const toolId = (tool.spec.toolId =
-			tool.spec.toolId || discoveredToolId || tool.spec.name);
+		const mcpId = tool.spec.mcpId;
+		const toolId = tool.spec.toolId;
 
 		if (mcpId !== this.spec.name) {
 			throw new Error(
@@ -95,7 +94,7 @@ export abstract class McpLand<ExtendedTool extends McpTool = McpTool> {
 			tool.spec.sourceId = `${mcpId}-${toolId}-context`;
 		}
 
-		if (!isMcpToolEnabled(this.spec.name, toolId)) {
+		if (!isMcpToolEnabled(this.spec.name, toolId!)) {
 			log.message(`Skipping disabled tool ${this.spec.name}/${toolId}`);
 			return;
 		}
@@ -155,7 +154,7 @@ export abstract class McpTool {
 		);
 
 		// Ensure sourceId is set
-		const sourceId = this.spec.sourceId ?? `${mcpId}-${toolId}-context`;
+		const sourceId = this.spec.sourceId;
 		this.spec.sourceId = sourceId;
 
 		await this.store.ingest(

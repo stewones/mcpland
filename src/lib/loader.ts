@@ -61,7 +61,7 @@ export async function loadAvailableMcps() {
 										? new maybeDefault()
 										: maybeDefault;
 
-								instance.registerTool(toolInstance, toolFolder);
+								instance.registerTool(toolInstance);
 							} catch (err) {
 								throw new Error(
 									`Failed to register tool ${name}/${toolFolder}: ${JSON.stringify(err, null, 2)}`
