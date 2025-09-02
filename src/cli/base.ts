@@ -2,7 +2,6 @@ import pc from 'picocolors';
 
 import pkg from '../../package.json';
 import { McpLandCommand } from './command';
-import { HelpCommand } from './commands/help';
 import { InitCommand } from './commands/init';
 import { LinkCommand } from './commands/link';
 import { ServeCommand } from './commands/serve';
@@ -36,13 +35,47 @@ export class McpLandCli {
 		return Array.from(set.values());
 	}
 
+	printGlobalHelp(): void {
+		const program = this.getProgramName();
+		console.log(`Usage: ${program} <command> [options]`);
+		console.log('');
+		console.log('Global options:');
+		console.log('  --version, -v        Show version number');
+		console.log('  --help, -h           Show this help message');
+		console.log('');
+		console.log('Commands:');
+		const commands = this.getCommands();
+		for (const cmd of commands) {
+			const line = cmd.description
+				? `  ${cmd.name.padEnd(12)} ${cmd.description}`
+				: `  ${cmd.name}`;
+			console.log(line);
+		}
+		console.log('');
+		console.log(`Run '${program} <command> --help' for more information on a specific command.`);
+	}
+
 	async run(argv: string[] = process.argv.slice(2)): Promise<number> {
+		// Handle global --version flag
+		if (argv.includes('--version') || argv.includes('-v')) {
+			console.log(this.options?.version ?? '0.0.0');
+			return 0;
+		}
+
 		const [cmdName, ...args] = argv;
+		
+		// Handle global --help flag (only when no command is specified)
+		if (!cmdName && (argv.includes('--help') || argv.includes('-h'))) {
+			this.printGlobalHelp();
+			return 0;
+		}
+
 		const lookup = cmdName ?? '';
 		const cmd = this.commands.get(lookup);
 		if (!cmd) {
-			// run the help command instead
-			await this.commands.get('help')?.run(args, this);
+			// No command found, show help
+			console.log(pc.red(`Command not found: ${lookup}`));
+			this.printGlobalHelp();
 			return 1;
 		}
 		try {
@@ -62,7 +95,6 @@ export class McpLandCli {
 const cli = new McpLandCli({ name: 'mcp', version: pkg.version });
 
 cli
-	.addCommand(new HelpCommand())
 	.addCommand(new InitCommand())
 	.addCommand(new ServeCommand())
 	.addCommand(new LinkCommand());
