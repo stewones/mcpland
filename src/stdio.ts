@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 import { createMcpClient, loadAvailableMcps, SqliteEmbedStore } from 'mcpland';
 
+import { log } from './lib/log';
+
 export async function stdio() {
-	console.warn('Starting MCP stdio');
+	log.step('Starting MCP stdio');
 
 	process.on('SIGTERM', () => {
-		console.warn('Shutting down MCPLand stdio');
+		log.step('Shutting down MCPLand stdio');
 		SqliteEmbedStore.shutdown();
 	});
 
@@ -16,12 +18,14 @@ export async function stdio() {
 
 	return createMcpClient()
 		.then(({ tools }) => {
-			console.warn(`MCP server running on stdio with ${tools.length} tools`);
-			console.warn(JSON.stringify(tools, null, 2));
+			log.step(`MCP server running on stdio with ${tools.length} tools`);
+			log.step(JSON.stringify(tools, null, 2));
 			return { tools };
 		})
 		.catch((error) => {
-			console.error('Failed to start MCP server:', error);
+			log.error(
+				`Failed to start MCP server: ${JSON.stringify(error, null, 2)}`
+			);
 			process.exit(1);
 		});
 }
@@ -30,16 +34,12 @@ function main() {
 	const currentFilePath = resolve(fileURLToPath(import.meta.url));
 	const mainScriptPath = resolve(process.argv[1]);
 
-	console.warn('currentFilePath', currentFilePath);
-	console.warn('mainScriptPath', mainScriptPath);
-
 	const isExecutedDirectly = currentFilePath.includes(mainScriptPath);
 
 	if (isExecutedDirectly) {
-		console.warn('MCPLand is executed directly');
 		return true;
 	}
-	console.warn('MCPLand is executed indirectly');
+
 	return false;
 }
 

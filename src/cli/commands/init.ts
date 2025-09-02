@@ -244,7 +244,8 @@ export class InitCommand extends McpLandCommand {
 			);
 		}
 
-		log.step(pc.cyan('Run `mcp link cursor` to add to Cursor'));
+		log.step(pc.cyan('Run `mcp link cursor` to add stdio link to Cursor'));
+		log.step(pc.cyan('Run `mcp link cursor --sse` to add SSE link to Cursor'));
 		log.step(pc.cyan('Run `mcp serve` to serve SSE requests'));
 
 		outro('Initialization complete 🎉');

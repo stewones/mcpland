@@ -11,6 +11,8 @@ import {
 
 import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
 
+import { log } from '../lib/log';
+
 export type JsonSchema = Record<string, any>;
 
 export interface McpSpec {
@@ -94,7 +96,7 @@ export abstract class McpLand<ExtendedTool extends McpTool = McpTool> {
 		}
 
 		if (!isMcpToolEnabled(this.spec.name, toolId)) {
-			console.warn(`Skipping disabled tool ${this.spec.name}/${toolId}`);
+			log.message(`Skipping disabled tool ${this.spec.name}/${toolId}`);
 			return;
 		}
 		this.tools.push(tool);
@@ -127,11 +129,11 @@ export abstract class McpTool {
 		const mcpId = this.spec.mcpId ?? 'unknown-mcp';
 		const toolId = this.spec.toolId ?? this.spec.name;
 
-		console.warn(`Initializing ${mcpId}/${toolId}...`);
+		log.step(`Initializing ${mcpId}/${toolId}...`);
 
 		if (this.spec.mcpId && this.spec.toolId) {
 			if (!isMcpToolEnabled(this.spec.mcpId, this.spec.toolId)) {
-				console.warn(
+				log.warn(
 					`Tool disabled by config: ${this.spec.mcpId}/${this.spec.toolId}`
 				);
 				return;
@@ -141,17 +143,16 @@ export abstract class McpTool {
 		// Always fetch and attempt ingestion - store will skip duplicate chunks
 		const docsText = await this.fetchContext();
 
-		console.warn(
-			'Fetched context for',
-			this.spec.name,
-			'with length',
-			docsText.length,
-			`${docsText.substring(0, 100)}...`
+		log.message(
+			`Fetched context for ${this.spec.name} with length ${docsText.length} `
 		);
+		log.message(`${docsText.substring(0, 100)}...`);
 
 		const chunks = chunkText(docsText, this.spec.chunkOptions);
 
-		console.warn('Ingesting chunks for', `${mcpId}/${toolId}`, chunks.length);
+		log.message(
+			`Ingesting chunks for ${mcpId}/${toolId} with length ${chunks.length}`
+		);
 
 		// Ensure sourceId is set
 		const sourceId = this.spec.sourceId ?? `${mcpId}-${toolId}-context`;

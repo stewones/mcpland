@@ -52,6 +52,7 @@ async function bundle(): Promise<void> {
 	const exec = [
 		build([path.join(rootDir, 'src/index.ts')], externals, distDir),
 		build([path.join(rootDir, 'src/bin.ts')], externals, distDir),
+		build([path.join(rootDir, 'src/sse.ts')], externals, distDir),
 	];
 
 	Promise.all(exec);

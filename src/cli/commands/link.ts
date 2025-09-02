@@ -3,27 +3,70 @@ import pc from 'picocolors';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { intro, outro } from '@clack/prompts';
+import { cancel, intro, isCancel, outro, text } from '@clack/prompts';
 
 import { McpLandCommand } from '../command';
 
 export class LinkCommand extends McpLandCommand {
 	constructor() {
-		super('link', 'Configure Cursor stdio link');
+		super('link', 'Configure Cursor link');
+		
+		// Define options for this command
+		this.defineOption({
+			name: 'sse',
+			type: 'boolean',
+			description: 'Use SSE transport instead of stdio',
+			default: false
+		});
 	}
 
 	aliases(): string[] {
 		return ['link:cursor', 'cursor'];
 	}
 
-	async run(_args: string[], _cli: any): Promise<number> {
-		intro('Add MCPLand to Cursor');
+	async run(args: string[], _cli: any): Promise<number> {
+		const parsed = this.parseArgs(args);
+		const useSSE = parsed.sse as boolean;
+		const mode = useSSE ? 'SSE' : 'stdio';
+		
+		intro(`Add MCPLand to Cursor (${mode} mode)`);
 		const root = process.cwd();
 
 		const key = readEnvVar(root, 'OPENAI_API_KEY');
 		if (!key) {
 			console.error(pc.red('OPENAI_API_KEY not found in .env'));
 			return 1;
+		}
+
+		let sseUrl = '';
+		if (useSSE) {
+			const urlInput = await text({
+				message: 'Enter SSE server URL',
+				placeholder: 'http://localhost:1337',
+				initialValue: 'http://localhost:1337',
+				validate: (v) => {
+					if (!v || v.trim().length === 0) {
+						return 'Please enter a valid URL';
+					}
+					try {
+						new URL(v.trim());
+						return undefined;
+					} catch {
+						return 'Please enter a valid URL (e.g., http://localhost:1337)';
+					}
+				},
+			});
+
+			if (isCancel(urlInput)) {
+				cancel('Aborted');
+				return 1;
+			}
+
+			sseUrl = String(urlInput).trim();
+			// Ensure URL ends with /sse for the SSE endpoint
+			if (!sseUrl.endsWith('/sse')) {
+				sseUrl = sseUrl.replace(/\/+$/, '') + '/sse';
+			}
 		}
 
 		const cursorDir = path.join(root, '.cursor');
@@ -45,18 +88,31 @@ export class LinkCommand extends McpLandCommand {
 				? cfg.mcpServers
 				: {};
 
-		const jsPath = path.join(root, 'node_modules', 'mcpland', 'index.js');
+		if (useSSE) {
+			// Configure for SSE transport
+			cfg.mcpServers['MCPLand'] = {
+				url: sseUrl
+			};
+		} else {
+			// Configure for stdio transport
+			const jsPath = path.join(root, 'node_modules', 'mcpland', 'index.js');
 
-		const stdioPath = jsPath;
-
-		cfg.mcpServers['MCPLand'] = {
-			command: 'bun',
-			args: [stdioPath],
-			env: { OPENAI_API_KEY: key },
-		};
+			cfg.mcpServers['MCPLand'] = {
+				command: 'bun',
+				args: [jsPath],
+				env: { OPENAI_API_KEY: key },
+			};
+		}
 
 		writeFileSync(cursorCfgPath, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
-		outro(pc.green(`Updated ${path.relative(root, cursorCfgPath)}`));
+		
+		if (useSSE) {
+			outro(pc.green(`Updated ${path.relative(root, cursorCfgPath)} for SSE mode`));
+			console.log(pc.cyan('Make sure to run `mcp serve --port=<port>` to start the SSE server'));
+		} else {
+			outro(pc.green(`Updated ${path.relative(root, cursorCfgPath)} for stdio mode`));
+		}
+		
 		return 0;
 	}
 }

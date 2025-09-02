@@ -81,10 +81,10 @@ class YourTool extends McpTool {
 
 # Roadmap
 
-- [ ] Add ability to serve SSE requests
+- [x] Add ability to serve SSE requests
 - [ ] Add ability to schedule context updates
 - [ ] Add ability to link with cursor globally
-- [ ] Add ability scaffold new mcps
+- [ ] Add ability to scaffold new mcps
 
 # License
 

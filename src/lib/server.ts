@@ -14,6 +14,8 @@ import {
 	ServerResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { log } from './log';
+
 export async function startMcpServer(
 	config: McpServerConfig,
 	tools: McpToolDefinition[]
@@ -90,7 +92,7 @@ export function createMcpServer(
 export async function createMcpClient(): Promise<{
 	tools: McpToolDefinition[];
 }> {
-	console.warn('Creating MCP client');
+	log.step('Creating MCP client');
 
 	// Aggregate tool definitions from all MCPs
 	const allToolDefs = McpRegistry.getAll().flatMap((entry) =>

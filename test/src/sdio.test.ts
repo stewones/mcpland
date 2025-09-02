@@ -50,8 +50,6 @@ vi.mock('../../src/lib/server', () => ({
 		return { tools: allToolDefs };
 	}),
 	stdio: vi.fn(async () => {
-		console.warn('Starting MCP stdio');
-
 		// Simulate loadAvailableMcps
 		await vi.fn(async () => {})();
 
@@ -69,11 +67,7 @@ vi.mock('../../src/lib/server', () => ({
 				startSpy({ name: 'McpLand' }, allToolDefs);
 				return { tools: allToolDefs };
 			})();
-
-			console.warn(
-				`MCP server running on stdio with ${result.tools.length} tools`
-			);
-			console.warn(JSON.stringify(result.tools, null, 2));
+			
 			return result;
 		} catch (error) {
 			console.error('Failed to start MCP server:', error);

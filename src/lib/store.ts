@@ -8,6 +8,7 @@ import path, { dirname } from 'node:path';
 import { openai } from '@ai-sdk/openai';
 
 import { getRootDir } from './config';
+import { log } from './log';
 
 export const EMBEDDING_MODEL = 'text-embedding-3-small';
 export const DB_PATH = '.data/context.sqlite';
@@ -48,7 +49,7 @@ export class SqliteEmbedStore {
 
 		SqliteEmbedStore.instances.add(this);
 
-		console.warn('MCPLand Embedding Store', absoluteDbPath);
+		log.warn(`MCPLand Embedding Store: ${absoluteDbPath}`);
 		this.init();
 	}
 
@@ -163,24 +164,22 @@ export class SqliteEmbedStore {
 		let idx = 0;
 		for (const content of chunks) {
 			if (this.stopRequested) {
-				console.warn('Ingestion cancelled - stopping at chunk', idx);
+				log.warn(`Ingestion cancelled - stopping at chunk ${idx}`);
 				break;
 			}
 			const hash = Bun.hash(content);
 			if (this.hasChunkByHash(source.id, String(hash))) {
-				//console.warn('Skipping chunk', idx);
 				idx++;
 				continue; // Skip if chunk already exists
 			}
-			console.warn('Embedding chunk', idx);
+			log.warn(`Embedding chunk ${idx}`);
 			const vector = await this.embedText(content);
-			console.warn('Inserting chunk', idx);
+			log.warn(`Inserting chunk ${idx}`);
 			this.insertChunk(source.id, idx, content, String(hash), vector);
-			console.warn('Inserted chunk', idx);
 			idx++;
 		}
 
-		console.warn(
+		log.warn(
 			`Finished ingestion for ${mcpId}/${toolId} with ${idx} chunks`
 		);
 	}

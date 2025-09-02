@@ -9,23 +9,24 @@ import {
 	isMcpEnabled,
 	isMcpToolEnabled,
 } from './config';
+import { log } from './log';
 
 export async function loadAvailableMcps() {
 	const sourceFolder = getSourceFolder();
-	console.warn('sourceFolder', sourceFolder);
+	log.message(`sourceFolder: ${sourceFolder}`);
 
 	const rootDir = getRootDir();
-	console.warn('rootDir', rootDir);
+	log.message(`rootDir: ${rootDir}`);
 
 	const resolvedSourceDir = path.resolve(rootDir, sourceFolder);
 
-	console.warn('resolvedSourceDir', resolvedSourceDir);
+	log.message(`resolvedSourceDir: ${resolvedSourceDir}`);
 
 	const availableMcps = readdirSync(resolvedSourceDir).filter(
 		(file) => !file.includes('DS_Store')
 	);
 
-	console.warn('Loading available MCPs for', availableMcps);
+	log.message(`Loading available MCPs for: ${availableMcps}`);
 
 	for (const mcp of availableMcps) {
 		const mcpModule = await import(`${resolvedSourceDir}/${mcp}`);
@@ -75,7 +76,7 @@ export async function loadAvailableMcps() {
 
 					McpRegistry.register(instance);
 				} catch (err) {
-					console.error('Failed to load tools for MCP', name, err);
+					log.error(`Failed to load tools for MCP ${name}: ${JSON.stringify(err, null, 2)}`);
 				}
 			}
 		}

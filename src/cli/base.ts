@@ -49,6 +49,11 @@ export class McpLandCli {
 			return await cmd.run(args, this);
 		} catch (err) {
 			console.error(pc.red(`Command failed: ${String(err)}`));
+			// If it's a help-related error, show command help
+			if (String(err).includes('Unknown option') || String(err).includes('requires a value') || String(err).includes('missing')) {
+				console.log('');
+				cmd.printHelp();
+			}
 			return 1;
 		}
 	}
