@@ -14,6 +14,7 @@ MCPLand is a TypeScript framework for building and managing **Model Context Prot
   - [Quick Start](#quick-start)
   - [Commands](#commands)
     - [`mcp init`](#mcp-init)
+    - [`mcp new`](#mcp-new)
     - [`mcp serve`](#mcp-serve)
     - [`mcp link`](#mcp-link)
   - [Global Options](#global-options)
@@ -44,13 +45,16 @@ bun install -g mcpland
 # Initialize a new MCP project
 mcp init
 
+# Scaffold a new MCP (inside the project)
+mcp new my-mcp
+
 # Link with Cursor IDE (stdio mode)
 mcp link cursor
 
 # Or link with Cursor IDE (SSE mode)
 mcp link cursor --sse
 
-# Start SSE server (if using SSE mode)
+# Start SSE server (required for SSE mode)
 mcp serve
 ```
 
@@ -79,6 +83,38 @@ mcp init
 - Source directory for MCPs (default: `src/mcps`)
 - OpenAI API key
 - Selection of available MCP tools from registry
+
+### `mcp new`
+
+Scaffold a new MCP from the [base template](https://github.com/stewones/mcpland/tree/main/src/mcps/_).
+
+**Usage:**
+```bash
+mcp new [name]
+```
+
+**Arguments:**
+- `name` - Optional MCP name. If omitted, it will be asked for.
+
+**What it does:**
+- Creates `src/mcps/<name>/index.ts`
+- Creates an initial tool at `src/mcps/<name>/tools/<tool>/index.ts`
+- Prints next steps to edit your MCP and add more tools.
+
+**Interactive prompts:**
+- MCP name (if not provided as an argument)
+- MCP description
+- Initial tool name (e.g., `docs`)
+- Tool description
+
+**Examples:**
+```bash
+mcp new                    # Fully interactive
+mcp new my-mcp             # Skips name prompt, asks for the rest
+```
+
+**Notes:**
+- Run this command inside your project root (where `mcpland.json` lives). If `mcp init` created a new folder, `cd` into it first.
 
 ### `mcp serve`
 
@@ -146,6 +182,7 @@ mcp <command> --help        # Show help for specific command
 ```bash
 mcp --help                  # Show general help and command list
 mcp init --help             # Show help for init command
+mcp new --help              # Show help for new command
 mcp serve --help            # Show help for serve command
 mcp link --help             # Show help for link command
 ```
@@ -239,7 +276,7 @@ class YourTool extends McpTool {
 - [x] Add ability to serve SSE requests
 - [ ] Add ability to schedule context updates
 - [ ] Add ability to link with cursor globally
-- [ ] Add ability to scaffold new mcps
+- [x] Add ability to scaffold new mcps
 
 # License
 

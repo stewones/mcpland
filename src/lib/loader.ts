@@ -23,7 +23,7 @@ export async function loadAvailableMcps() {
 	log.message(`resolvedSourceDir: ${resolvedSourceDir}`);
 
 	const availableMcps = readdirSync(resolvedSourceDir).filter(
-		(file) => !file.includes('DS_Store')
+		(file) => !file.includes('DS_Store') && !file.startsWith('_')
 	);
 
 	log.message(`Loading available MCPs for: ${availableMcps}`);

@@ -866,7 +866,7 @@ describe('Init command helper methods', () => {
 	});
 
 	it('toolHasContextUrl detects contextFile in directory files', async () => {
-		// Test the branch where contextUrl is false but contextFile is true (line 228)
+		// Test the branch where contextUrl is false but contextFile is true
 		// Reset mocks before the test
 		mockFs.statSync.mockReset();
 		mockFs.readdirSync.mockReset();

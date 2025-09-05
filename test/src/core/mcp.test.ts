@@ -462,7 +462,7 @@ describe('McpLand base class', () => {
 		// Simulate the logic from line 158
 		sourceId = sourceId || `${mcpId}-${toolId}-context`;
 		
-		// Should have auto-generated sourceId (line 158 logic)
+		// Should have auto-generated sourceId
 		expect(sourceId).toBe('my-mcp-my-tool-context');
 	});
 

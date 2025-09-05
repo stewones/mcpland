@@ -1,0 +1,14 @@
+import { McpLand } from 'mcpland';
+
+class {{MCP_CLASS_NAME}}Mcp extends McpLand {
+	static name = '{{MCP_NAME}}';
+	static description = '{{MCP_DESCRIPTION}}';
+
+	constructor() {
+		super({ name: {{MCP_CLASS_NAME}}Mcp.name, description: {{MCP_CLASS_NAME}}Mcp.description });
+		// Tools are discovered and registered automatically
+		// use the mcpland.json to enable/disable tools
+	}
+}
+
+export default new {{MCP_CLASS_NAME}}Mcp();
