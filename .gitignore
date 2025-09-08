@@ -16,7 +16,7 @@ coverage.txt
 .env.production.local
 
 # Data
-.sqlite
+*.sqlite
 
 # Others
 TODO.md
