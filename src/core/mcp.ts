@@ -190,6 +190,41 @@ export abstract class McpTool {
 		return fileText;
 	}
 
+	/**
+	 * Check if a file is likely binary by examining its content
+	 */
+	private async isBinaryFile(filePath: string, readFileSync: any): Promise<boolean> {
+		try {
+			// Read first 8KB to check for binary content
+			const buffer = readFileSync(filePath, { encoding: null, flag: 'r' });
+			const chunk = buffer.subarray(0, Math.min(8192, buffer.length));
+			
+			// Check for null bytes (common in binary files)
+			if (chunk.indexOf(0) !== -1) {
+				return true;
+			}
+			
+			// Check ratio of non-printable characters
+			let nonPrintableCount = 0;
+			for (let i = 0; i < chunk.length; i++) {
+				const byte = chunk[i];
+				// Consider bytes outside printable ASCII range (excluding common whitespace)
+				if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
+					nonPrintableCount++;
+				} else if (byte > 126) {
+					nonPrintableCount++;
+				}
+			}
+			
+			// If more than 30% of characters are non-printable, consider it binary
+			const nonPrintableRatio = nonPrintableCount / chunk.length;
+			return nonPrintableRatio > 0.3;
+		} catch {
+			// If we can't read the file, assume it's binary to be safe
+			return true;
+		}
+	}
+
 	protected async fetchFromDirectory(): Promise<string> {
 		// Build context from contextDir (recursive text files) when provided
 		let docsText: string = '';
@@ -198,25 +233,9 @@ export abstract class McpTool {
 			const dirToRead = `${baseDir}/${this.spec.contextDir}`;
 			const { readdirSync, statSync, readFileSync } = await import('node:fs');
 			const pathMod = await import('node:path');
-			const TEXT_EXTS = new Set([
-				'.txt',
-				'.md',
-				'.mdx',
-				'.markdown',
-				'.json',
-				'.yml',
-				'.yaml',
-				'.ini',
-				'.cfg',
-				'.conf',
-				'.toml',
-				'.csv',
-				'.tsv',
-				'.html',
-				'.htm',
-			]);
+			
 			const files: string[] = [];
-			const walk = (dir: string) => {
+			const walk = async (dir: string) => {
 				let entries: string[] = [];
 				try {
 					entries = readdirSync(dir);
@@ -227,16 +246,20 @@ export abstract class McpTool {
 					const full = pathMod.join(dir, entry);
 					try {
 						const st = statSync(full);
-						if (st.isDirectory()) walk(full);
-						else if (st.isFile()) {
-							const ext = pathMod.extname(entry).toLowerCase();
-							if (TEXT_EXTS.has(ext)) files.push(full);
+						if (st.isDirectory()) {
+							await walk(full);
+						} else if (st.isFile()) {
+							// Skip files that are likely binary
+							const isBinary = await this.isBinaryFile(full, readFileSync);
+							if (!isBinary) {
+								files.push(full);
+							}
 						}
 						// eslint-disable-next-line no-empty
 					} catch {}
 				}
 			};
-			walk(dirToRead);
+			await walk(dirToRead);
 			const pieces: string[] = [];
 			for (const f of files) {
 				try {
@@ -244,7 +267,7 @@ export abstract class McpTool {
 					const content = readFileSync(f, 'utf-8');
 					pieces.push(`=== ${rel} ===\n\n${content}`);
 				} catch {
-					// ignore read errors
+					// ignore read errors (file might be binary despite our check)
 				}
 			}
 			docsText = pieces.join('\n\n');
