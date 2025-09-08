@@ -193,14 +193,15 @@ export abstract class McpTool {
 	/**
 	 * Check if a file is likely binary by examining its content
 	 */
-	private async isBinaryFile(
-		filePath: string,
-		readFileSync: any
-	): Promise<boolean> {
+	private async isBinaryFile(filePath: string): Promise<boolean> {
+		const { openSync, readSync, closeSync } = await import('node:fs');
 		try {
-			// Read first 8KB to check for binary content
-			const buffer = readFileSync(filePath, { encoding: null, flag: 'r' });
-			const chunk = buffer.subarray(0, Math.min(8192, buffer.length));
+			// Read first 8KB only
+			const fd = openSync(filePath, 'r');
+			const buffer = Buffer.allocUnsafe(8192);
+			const bytesRead = readSync(fd, buffer, 0, 8192, 0);
+			closeSync(fd);
+			const chunk = buffer.subarray(0, bytesRead);
 
 			// Check for null bytes (common in binary files)
 			if (chunk.indexOf(0) !== -1) {
