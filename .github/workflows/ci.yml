@@ -35,21 +35,6 @@ jobs:
     - name: Run tests with coverage
       run: bun run test:coverage
 
-    # - name: Prepare coverage report in markdown
-    #   if: github.event_name == 'pull_request'
-    #   id: coverage
-    #   uses: fingerprintjs/action-coverage-report-md@v2
-    #   with:
-    #     textReportPath: './coverage.txt'
-    #     srcBasePath: './src'
-
-    # - name: Comment coverage report on PR
-    #   if: github.event_name == 'pull_request'
-    #   uses: marocchino/sticky-pull-request-comment@v2
-    #   with:
-    #     message: ${{ steps.coverage.outputs.markdownReport }}
-    #     header: Coverage Report
-
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

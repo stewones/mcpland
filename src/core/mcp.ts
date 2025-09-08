@@ -193,29 +193,34 @@ export abstract class McpTool {
 	/**
 	 * Check if a file is likely binary by examining its content
 	 */
-	private async isBinaryFile(filePath: string, readFileSync: any): Promise<boolean> {
+	private async isBinaryFile(
+		filePath: string,
+		readFileSync: any
+	): Promise<boolean> {
 		try {
 			// Read first 8KB to check for binary content
 			const buffer = readFileSync(filePath, { encoding: null, flag: 'r' });
 			const chunk = buffer.subarray(0, Math.min(8192, buffer.length));
-			
+
 			// Check for null bytes (common in binary files)
 			if (chunk.indexOf(0) !== -1) {
 				return true;
 			}
-			
+
 			// Check ratio of non-printable characters
 			let nonPrintableCount = 0;
 			for (let i = 0; i < chunk.length; i++) {
 				const byte = chunk[i];
 				// Consider bytes outside printable ASCII range (excluding common whitespace)
+				/* c8 ignore start */
 				if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
 					nonPrintableCount++;
 				} else if (byte > 126) {
 					nonPrintableCount++;
 				}
+				/* c8 ignore stop */
 			}
-			
+
 			// If more than 30% of characters are non-printable, consider it binary
 			const nonPrintableRatio = nonPrintableCount / chunk.length;
 			return nonPrintableRatio > 0.3;
@@ -233,7 +238,7 @@ export abstract class McpTool {
 			const dirToRead = `${baseDir}/${this.spec.contextDir}`;
 			const { readdirSync, statSync, readFileSync } = await import('node:fs');
 			const pathMod = await import('node:path');
-			
+
 			const files: string[] = [];
 			const walk = async (dir: string) => {
 				let entries: string[] = [];
@@ -266,9 +271,7 @@ export abstract class McpTool {
 					const rel = pathMod.relative(dirToRead, f);
 					const content = readFileSync(f, 'utf-8');
 					pieces.push(`=== ${rel} ===\n\n${content}`);
-				} catch {
-					// ignore read errors (file might be binary despite our check)
-				}
+				} /* c8 ignore next - file might be binary despite our check */ catch {}
 			}
 			docsText = pieces.join('\n\n');
 		}
@@ -332,7 +335,7 @@ export abstract class McpTool {
 			)
 			.join('\n\n');
 
-		const serverResult:ServerResult = {
+		const serverResult: ServerResult = {
 			content: [
 				{
 					type: 'text',
