@@ -1,6 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { NewCommand } from '../../../../src/cli/commands/new';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { Dirent, PathLike } from 'node:fs';
+
+import { NewCommand } from '../../../../src/cli/commands/new';
 
 // Mock external dependencies with simple implementations
 vi.mock('@clack/prompts', () => ({

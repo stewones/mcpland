@@ -1,6 +1,6 @@
 {
   "name": "mcpland",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "type": "module",
   "description": "Building blocks for implementing Model Context Protocol tools.",
@@ -18,8 +18,10 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage --config=vitest.config.ts",
     "coverage": "bun run test:coverage && open coverage/index.html",
+    "coverage:ci": "bun run ./scripts/coverage.ts",
     "format": "format-imports ./src --config=./import.json && format-imports ./test --config=./import.json",
-    "badges": "bun run ./scripts/badges.ts"
+    "badges": "bun run ./scripts/badges.ts",
+    "publish": "bun run build && cd dist && npm publish"
   },
   "exports": {
     ".": {

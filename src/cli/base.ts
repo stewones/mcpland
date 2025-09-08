@@ -4,8 +4,8 @@ import pkg from '../../package.json';
 import { McpLandCommand } from './command';
 import { InitCommand } from './commands/init';
 import { LinkCommand } from './commands/link';
-import { ServeCommand } from './commands/serve';
 import { NewCommand } from './commands/new';
+import { ServeCommand } from './commands/serve';
 
 export type McpLandCliOptions = {
 	name?: string;
