@@ -29,7 +29,7 @@ export class McpRegistry {
 				}
 			}
 		);
-		await Promise.all(promises);
+		await Promise.allSettled(promises);
 	}
 
 	static getAll(): McpRegistryEntry[] {

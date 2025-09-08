@@ -4,6 +4,7 @@ import pkg from '../../package.json';
 import { McpLandCommand } from './command';
 import { InitCommand } from './commands/init';
 import { LinkCommand } from './commands/link';
+import { NewCommand } from './commands/new';
 import { ServeCommand } from './commands/serve';
 
 export type McpLandCliOptions = {
@@ -52,7 +53,9 @@ export class McpLandCli {
 			console.log(line);
 		}
 		console.log('');
-		console.log(`Run '${program} <command> --help' for more information on a specific command.`);
+		console.log(
+			`Run '${program} <command> --help' for more information on a specific command.`
+		);
 	}
 
 	async run(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -63,7 +66,7 @@ export class McpLandCli {
 		}
 
 		const [cmdName, ...args] = argv;
-		
+
 		// Handle global --help flag (only when no command is specified)
 		if (!cmdName && (argv.includes('--help') || argv.includes('-h'))) {
 			this.printGlobalHelp();
@@ -83,7 +86,11 @@ export class McpLandCli {
 		} catch (err) {
 			console.error(pc.red(`Command failed: ${String(err)}`));
 			// If it's a help-related error, show command help
-			if (String(err).includes('Unknown option') || String(err).includes('requires a value') || String(err).includes('missing')) {
+			if (
+				String(err).includes('Unknown option') ||
+				String(err).includes('requires a value') ||
+				String(err).includes('missing')
+			) {
 				console.log('');
 				cmd.printHelp();
 			}
@@ -96,6 +103,7 @@ const cli = new McpLandCli({ name: 'mcp', version: pkg.version });
 
 cli
 	.addCommand(new InitCommand())
+	.addCommand(new NewCommand())
 	.addCommand(new ServeCommand())
 	.addCommand(new LinkCommand());
 

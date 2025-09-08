@@ -1,0 +1,70 @@
+import z from 'zod';
+
+import { fetchWithRetry, McpTool, type McpToolSpec } from 'mcpland';
+
+import type { ServerResult } from '@modelcontextprotocol/sdk/types.js';
+
+// Optional: Add a context URL or file for this tool
+// const contextUrl = 'https://example.com/api/docs';
+// const contextFile = 'context.md';
+// const contextDir = 'some-context-folder'
+const chunkOptions = { maxChars: 1200, overlap: 200 };
+
+const spec: McpToolSpec = {
+	name: '{{TOOL_NAME}}',
+	description: '{{TOOL_DESCRIPTION}}',
+	// contextUrl, // Uncomment if you have a context URL
+	// contextFile, // Uncomment if you have a context file (relative to the tool directory)
+	// contextDir, // Uncomment if you have a context directory (relative to the tool directory)
+	chunkOptions,
+	schema: z.object({
+		query: z
+			.string()
+			.min(2)
+			.describe('Query parameter for the {{TOOL_NAME}} tool'),
+		limit: z
+			.number()
+			.int()
+			.min(1)
+			.max(50)
+			.optional()
+			.describe('Number of results to return (default 20)'),
+	}),
+};
+
+export class {{TOOL_CLASS_NAME}}Tool extends McpTool {
+	constructor() {
+		super(spec);
+	}
+
+	/**
+	 * Fetch initial context
+	 * this is automatically called at MCP initialization
+	 * so that embeddings can be stored in the local database
+	 */
+	async fetchContext(): Promise<string> {
+		// uncomment if you want to automatically extract context from the passed sources (url/file/dir)
+		// return await this.fetchAvailableContext();
+
+		// For now, return a simple context string
+		return `
+			This is the context for the {{TOOL_NAME}} tool in the {{MCP_NAME}} MCP.
+			You can customize this by:
+			1. Adding a contextUrl to fetch context from a web API
+			2. Adding a contextFile to read context from a local file
+			3. Adding a contextDir to read text files from a local dir
+			4. Implementing custom logic to generate context dynamically
+		`;
+	}
+
+	/**
+	 * Handle context for user inquiries
+	 * you can hook in and customize context as per tool requirements
+	 * check the default implementation in the McpTool class
+	 */
+	async handleContext(args: unknown): Promise<ServerResult> {
+		return await this.handleAvailableContext(args);
+	}
+}
+
+export default new {{TOOL_CLASS_NAME}}Tool();

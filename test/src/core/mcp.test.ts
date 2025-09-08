@@ -100,6 +100,301 @@ describe('McpTool base class', () => {
 		const path = tool['getToolPath']();
 		expect(path).toBe('mcps/foo/tools/bar');
 	});
+
+	it('init ingests from contextDir recursively and ignores binaries', async () => {
+		// Mock node:fs for recursive directory reading
+		const readdirMock = vi.fn((p: string) => {
+			if (p.includes('mcps/foo/tools/dirtool/docs/sub')) return ['b.txt', 'bin.bin'];
+			if (p.includes('mcps/foo/tools/dirtool/docs')) return ['a.md', 'img.png', 'sub'];
+			return [] as any;
+		});
+		const statMock = vi.fn((p: string) => {
+			const isFile = () => /a\.md$/.test(p) || /b\.txt$/.test(p) || /img\.png$/.test(p) || /bin\.bin$/.test(p);
+			const isDirectory = () => /(^|\/)docs(\/)?$/.test(p) || /\/docs\/sub$/.test(p);
+			return { isFile, isDirectory } as any;
+		});
+		const readFileMock = vi.fn((p: string) => {
+			if (/a\.md$/.test(p)) return 'Content A';
+			if (/b\.txt$/.test(p)) return 'Content B';
+			throw new Error('should not read binaries');
+		});
+
+		vi.doMock('node:fs', () => ({
+			readdirSync: readdirMock,
+			statSync: statMock,
+			readFileSync: readFileMock,
+		}));
+
+		class DirTool extends McpTool {
+			constructor() {
+				super({
+					name: 'dirtool',
+					description: 'dir tool',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'dirtool',
+					contextDir: 'docs',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> {
+				// For directory ingestion, delegate to built-in directory reader
+				// so init() can proceed with ingestion.
+				// @ts-ignore - access protected method for testing
+				return this.fetchFromDirectory();
+			}
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new DirTool();
+		await tool.init();
+
+		// It should have chunked a concatenation of the two text files in order
+		const arg = chunkSpy.mock.calls[0]?.[0];
+		expect(arg).toContain('=== a.md ===');
+		expect(arg).toContain('Content A');
+		expect(arg).toContain('=== sub/b.txt ===');
+		expect(arg).toContain('Content B');
+
+		// Ensure binaries were not read
+		expect(readFileMock).toHaveBeenCalledTimes(2);
+
+		// Ingestion should include dir meta
+		expect(ingestSpy).toHaveBeenCalledWith(
+			{ id: 'source-1', meta: { name: 'dirtool', url: undefined, file: undefined, dir: 'docs' } },
+			['c1', 'c2'],
+			{ mcpId: 'foo', toolId: 'dirtool' }
+		);
+	});
+
+	it('contextDir handles readdirSync errors gracefully', async () => {
+		// Force readdirSync to throw to cover catch path
+		const readdirMock = vi.fn(() => { throw new Error('boom'); });
+		const statMock = vi.fn();
+		const readFileMock = vi.fn();
+
+		vi.doMock('node:fs', () => ({
+			readdirSync: readdirMock,
+			statSync: statMock,
+			readFileSync: readFileMock,
+		}));
+
+		class DirTool extends McpTool {
+			constructor() {
+				super({
+					name: 'dirtool',
+					description: 'dir tool',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'dirtool',
+					contextDir: 'docs',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> {
+				// @ts-ignore - access protected method for testing
+				return this.fetchFromDirectory();
+			}
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new DirTool();
+		await tool.init();
+		// Even with error, code should proceed and attempt to chunk empty text
+		expect(chunkSpy).toHaveBeenCalled();
+	});
+
+	it('contextDir handles readFileSync errors per-file gracefully', async () => {
+		const readdirMock = vi.fn((p: string) => {
+			if (p.includes('mcps/foo/tools/dirtool/docs')) return ['a.md'];
+			return [] as any;
+		});
+		const statMock = vi.fn((_p: string) => ({ isDirectory: () => false, isFile: () => true }));
+		const readFileMock = vi.fn((_p: string) => { throw new Error('read error'); });
+
+		vi.doMock('node:fs', () => ({
+			readdirSync: readdirMock,
+			statSync: statMock,
+			readFileSync: readFileMock,
+		}));
+
+		class DirTool extends McpTool {
+			constructor() {
+				super({
+					name: 'dirtool',
+					description: 'dir tool',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'dirtool',
+					contextDir: 'docs',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> {
+				// @ts-ignore - access protected method for testing
+				return this.fetchFromDirectory();
+			}
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new DirTool();
+		await tool.init();
+		// Should still ingest with empty docs when read fails
+		expect(ingestSpy).toHaveBeenCalled();
+	});
+
+	it('contextDir handles statSync errors gracefully inside walk', async () => {
+		const readdirMock = vi.fn((p: string) => {
+			if (p.includes('mcps/foo/tools/dirtool/docs')) return ['bad.md'];
+			return [] as any;
+		});
+		const statMock = vi.fn((_p: string) => { throw new Error('stat error'); });
+		const readFileMock = vi.fn();
+
+		vi.doMock('node:fs', () => ({
+			readdirSync: readdirMock,
+			statSync: statMock,
+			readFileSync: readFileMock,
+		}));
+
+		class DirTool extends McpTool {
+			constructor() {
+				super({
+					name: 'dirtool',
+					description: 'dir tool',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'dirtool',
+					contextDir: 'docs',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> {
+				// @ts-ignore - access protected method for testing
+				return this.fetchFromDirectory();
+			}
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new DirTool();
+		await tool.init();
+		// statSync failure should be swallowed and processing continues
+		expect(chunkSpy).toHaveBeenCalled();
+	});
+
+	it('fetchAvailableContext concatenates url, file, and dir content', async () => {
+		class ComboTool extends McpTool {
+			constructor() {
+				super({
+					name: 'combo',
+					description: 'combo tool',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'bar',
+					contextUrl: 'http://example.com',
+					contextFile: 'path/to/file',
+					contextDir: 'docs',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			protected async fetchFromUrl(): Promise<string> { return 'URL'; }
+			protected async fetchFromFile(): Promise<string> { return 'FILE'; }
+			protected async fetchFromDirectory(): Promise<string> { return 'DIR'; }
+			async fetchContext(): Promise<string> { return 'ignored'; }
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new ComboTool();
+		const ctx = await tool.fetchAvailableContext();
+		expect(ctx).toBe('URLFILEDIR');
+	});
+
+	it('handleAvailableContext returns validation error on invalid args', async () => {
+		const tool = new TestTool('MyTool-MCP');
+		const result = await tool.handleAvailableContext({});
+		const text = (result as any).content?.[0]?.text as string;
+		expect(text).toContain('Invalid arguments');
+	});
+
+	it('handleAvailableContext returns formatted chunks when results found', async () => {
+		searchSpy.mockResolvedValueOnce([
+			{ content: 'Alpha', score: 0.9123 },
+			{ content: 'Beta', score: 0.5 },
+		] as any);
+		const tool = new TestTool('MyTool-MCP');
+		const result = await (tool as any).handleAvailableContext({ query: 'q' });
+		const text = (result as any).content?.[0]?.text as string;
+		expect(text).toContain('[[Chunk 1 | score=0.912]]');
+		expect(text).toContain('Alpha');
+		expect(text).toContain('[[Chunk 2 | score=0.500]]');
+		expect(text).toContain('Beta');
+	});
+
+	it('handleAvailableContext appends prompt when present', async () => {
+		searchSpy.mockResolvedValueOnce([
+			{ content: 'Zeta', score: 0.7777 },
+		] as any);
+		const tool = new TestTool('Prompt-MCP');
+		(tool as any).spec.prompt = 'Please use retrieved context wisely.';
+		const result = await (tool as any).handleAvailableContext({ query: 'q' });
+		const content = (result as any).content;
+		expect(Array.isArray(content)).toBe(true);
+		expect(content.length).toBe(2);
+		expect(content[1]).toEqual({ type: 'text', text: 'Please use retrieved context wisely.' });
+	});
+
+	it('handleAvailableContext returns no-results message when search yields empty array', async () => {
+		const tool = new TestTool('MyTool-MCP');
+		const result = await (tool as any).handleAvailableContext({ query: 'x' });
+		const text = (result as any).content?.[0]?.text as string;
+		expect(text).toBe('No relevant context found.');
+	});
+
+	it('fetchAvailableContext uses base fetchFromUrl and fetchFromFile', async () => {
+		// Mock mcpland to include fetchWithRetry and minimal others
+		vi.doMock('mcpland', () => ({
+			chunkText: (text: string, _opts: unknown) => chunkSpy(text, _opts),
+			DB_PATH: '.data/context.sqlite',
+			SqliteEmbedStore: class MockStore {
+				constructor(_path: string) {}
+				ingest = ingestSpy;
+				search = searchSpy;
+			},
+			getSourceFolder: () => 'mcps',
+			isMcpToolEnabled: vi.fn(() => true),
+			fetchWithRetry: vi.fn(async () => ({ text: async () => 'U' })),
+		}));
+
+		// Mock node:fs readFileSync used in base fetchFromFile
+		const readFileMock = vi.fn((_p: string, _e: string) => 'F');
+		vi.doMock('node:fs', () => ({ readFileSync: readFileMock }));
+
+		// Reset and re-import to bind mocks to module
+		vi.resetModules();
+		const { McpTool } = await import('../../../src/core/mcp');
+
+		class PlainTool extends McpTool {
+			constructor() {
+				super({
+					name: 'plain',
+					description: 'desc',
+					sourceId: 'source-1',
+					mcpId: 'foo',
+					toolId: 'bar',
+					contextUrl: 'http://example.com',
+					contextFile: 'some-file.txt',
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> { return 'ignored'; }
+			async handleContext() { return { content: [] }; }
+		}
+
+		const tool = new PlainTool();
+		const ctx = await tool.fetchAvailableContext();
+		expect(ctx).toBe('UF');
+		expect(readFileMock).toHaveBeenCalled();
+	});
 });
 
 describe('McpLand base class', () => {
@@ -122,10 +417,12 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool1 = new TestTool('tool1', 'test-mcp');
 		const tool2 = new TestTool('tool2', 'test-mcp');
+		(tool1 as any).spec.toolId = 'tool1';
+		(tool2 as any).spec.toolId = 'tool2';
 
 		// Register tools
-		(mcp as any).registerTool(tool1, 'tool1');
-		(mcp as any).registerTool(tool2, 'tool2');
+		(mcp as any).registerTool('test-mcp', tool1);
+		(mcp as any).registerTool('test-mcp', tool2);
 
 		// Initialize
 		await mcp.init();
@@ -149,9 +446,11 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool1 = new TestTool('tool1', 'test-mcp');
 		const tool2 = new TestTool('tool2', 'test-mcp');
+		(tool1 as any).spec.toolId = 'tool1';
+		(tool2 as any).spec.toolId = 'tool2';
 
-		(mcp as any).registerTool(tool1, 'tool1');
-		(mcp as any).registerTool(tool2, 'tool2');
+		(mcp as any).registerTool('test-mcp', tool1);
+		(mcp as any).registerTool('test-mcp', tool2);
 
 		const tools = mcp.getTools();
 		expect(tools).toHaveLength(2);
@@ -174,8 +473,9 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool = new TestTool('simple-tool');
 		tool.spec.mcpId = 'my-mcp';
+		(tool as any).spec.toolId = 'simple-tool';
 
-		(mcp as any).registerTool(tool);
+		(mcp as any).registerTool('my-mcp', tool);
 
 		const tools = mcp.getTools();
 		expect(tools[0].name).toBe('my-mcp-simple-tool');
@@ -196,7 +496,7 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const invalidTool = { spec: null };
 
-		expect(() => (mcp as any).registerTool(invalidTool)).toThrow('Tool is missing required config');
+		expect(() => (mcp as any).registerTool('test-mcp', invalidTool)).toThrow('Tool is missing required config');
 	});
 
 	it('registerTool throws on empty tool name', async () => {
@@ -214,7 +514,7 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool = new TestTool('');
 
-		expect(() => (mcp as any).registerTool(tool)).toThrow('Tool is missing required spec.name');
+		expect(() => (mcp as any).registerTool('test-mcp', tool)).toThrow('Tool is missing required spec.name');
 	});
 
 	it('registerTool skips disabled tools', async () => {
@@ -278,13 +578,13 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool = new LocalTestTool('disabled-tool', 'test-mcp');
 
-		(mcp as any).registerTool(tool, 'disabled');
+		(mcp as any).registerTool('test-mcp', tool);
 
 		const tools = mcp.getTools();
 		expect(tools).toHaveLength(0);
 	});
 
-	it('registerTool throws when MCP names do not match', async () => {
+	it('registerTool keeps tool mcpId when it differs from registry', async () => {
 		const { McpLand } = await import('../../../src/core/mcp');
 		
 		class TestMcp extends McpLand {
@@ -297,9 +597,47 @@ describe('McpLand base class', () => {
 		}
 
 		const mcp = new TestMcp();
-		const tool = new TestTool('tool1', 'different-mcp'); // Wrong MCP name
+		const tool = new TestTool('tool1', 'different-mcp'); // Different MCP name on tool
+		(tool as any).spec.toolId = 'tool1';
 
-		expect(() => (mcp as any).registerTool(tool)).toThrow('Tool MCP mismatch: expected test-mcp, got different-mcp');
+		// New behavior: no mismatch error, tool keeps its own mcpId
+		expect(() => (mcp as any).registerTool('test-mcp', tool)).not.toThrow();
+		const tools = mcp.getTools();
+		expect(tools[0].name).toBe('different-mcp-tool1');
+	});
+
+	it('registerTool auto-fills mcpId and toolId when missing', async () => {
+		const { McpLand, McpTool } = await import('../../../src/core/mcp');
+
+		class ToolWithoutIds extends McpTool {
+			constructor() {
+				super({
+					name: 'tool1',
+					description: 'Test tool',
+					sourceId: 'source-1',
+					// intentionally omit mcpId and toolId
+					schema: z.object({ query: z.string() }),
+				});
+			}
+			async fetchContext(): Promise<string> { return 'ctx'; }
+			async handleContext() { return { content: [] }; }
+		}
+
+		class TestMcp extends McpLand {
+			constructor() {
+				super({ name: 'auto-mcp', description: 'Auto MCP' });
+			}
+		}
+
+		const mcp = new TestMcp();
+		const tool = new ToolWithoutIds();
+
+		// When registering, mcpId should default from registry name and toolId from tool name
+		(mcp as any).registerTool('auto-mcp', tool);
+
+		expect(tool.spec.mcpId).toBe('auto-mcp');
+		expect(tool.spec.toolId).toBe('tool1');
+		expect(tool.spec.name).toBe('auto-mcp-tool1');
 	});
 
 	it('registerTool throws when tool description is missing', async () => {
@@ -333,7 +671,7 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool = new BadTool();
 
-		expect(() => (mcp as any).registerTool(tool)).toThrow('Tool is missing required spec.description');
+		expect(() => (mcp as any).registerTool('test-mcp', tool)).toThrow('Tool is missing required spec.description');
 	});
 
 	it('registerTool auto-generates sourceId when missing', async () => {
@@ -344,7 +682,7 @@ describe('McpLand base class', () => {
 				super({
 					name: 'tool1',
 					description: 'Test tool',
-					sourceId: '', // Empty sourceId
+					sourceId: undefined as any, // Missing sourceId
 					mcpId: 'test-mcp',
 					toolId: 'tool1',
 					schema: z.object({ query: z.string() }),
@@ -367,7 +705,7 @@ describe('McpLand base class', () => {
 		const mcp = new TestMcp();
 		const tool = new ToolWithoutSourceId();
 
-		(mcp as any).registerTool(tool, 'tool1');
+		(mcp as any).registerTool('test-mcp', tool);
 
 		// Should auto-generate sourceId
 		expect(tool.spec.sourceId).toBe('test-mcp-tool1-context');
@@ -462,7 +800,7 @@ describe('McpLand base class', () => {
 		// Simulate the logic from line 158
 		sourceId = sourceId || `${mcpId}-${toolId}-context`;
 		
-		// Should have auto-generated sourceId (line 158 logic)
+		// Should have auto-generated sourceId
 		expect(sourceId).toBe('my-mcp-my-tool-context');
 	});
 

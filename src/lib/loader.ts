@@ -23,7 +23,7 @@ export async function loadAvailableMcps() {
 	log.message(`resolvedSourceDir: ${resolvedSourceDir}`);
 
 	const availableMcps = readdirSync(resolvedSourceDir).filter(
-		(file) => !file.includes('DS_Store')
+		(file) => !file.includes('DS_Store') && !file.startsWith('_')
 	);
 
 	log.message(`Loading available MCPs for: ${availableMcps}`);
@@ -61,7 +61,7 @@ export async function loadAvailableMcps() {
 										? new maybeDefault()
 										: maybeDefault;
 
-								instance.registerTool(toolInstance);
+								instance.registerTool(mcp, toolInstance);
 							} catch (err) {
 								throw new Error(
 									`Failed to register tool ${name}/${toolFolder}: ${JSON.stringify(err, null, 2)}`
@@ -76,7 +76,9 @@ export async function loadAvailableMcps() {
 
 					McpRegistry.register(instance);
 				} catch (err) {
-					log.error(`Failed to load tools for MCP ${name}: ${JSON.stringify(err, null, 2)}`);
+					/* c8 ignore next 2 */
+					log.error(`Failed to load tools for MCP ${name}`);
+					console.warn(JSON.stringify(err, null, 2));
 				}
 			}
 		}

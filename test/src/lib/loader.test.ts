@@ -216,7 +216,7 @@ describe('loader behavior', () => {
     
     await loadAvailableMcps();
 
-    expect(mockMcp.default.registerTool).toHaveBeenCalledWith(mockToolInstance);
+    expect(mockMcp.default.registerTool).toHaveBeenCalledWith('angular', mockToolInstance);
   });
 
   it('skips tools that are disabled by config', async () => {

@@ -519,7 +519,7 @@ describe('config module behavior', () => {
     const { getRootDir } = await import('../../../src/lib/config');
     const result = getRootDir();
     
-    // The function should return a valid directory path (line 61 executed)
+    // The function should return a valid directory path
     expect(result).toBeDefined();
     expect(typeof result).toBe('string');
     // Should contain a path separator indicating it's a directory path

@@ -14,12 +14,13 @@ export const EMBEDDING_MODEL = 'text-embedding-3-small';
 export const DB_PATH = '.data/context.sqlite';
 
 export type Source = {
-	id: string; // Stable ID for the source (e.g., 'angular-llm-context')
-	meta?: {
-		name: string;
-		url?: string;
-		file?: string;
-	};
+    id: string; // Stable ID for the source (e.g., 'angular-llm-context')
+    meta?: {
+        name: string;
+        url?: string;
+        file?: string;
+        dir?: string;
+    };
 };
 
 export type SearchResult = {
