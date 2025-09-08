@@ -225,10 +225,10 @@ export abstract class McpTool {
 			// If more than 30% of characters are non-printable, consider it binary
 			const nonPrintableRatio = nonPrintableCount / chunk.length;
 			return nonPrintableRatio > 0.3;
-		} catch {
-			// If we can't read the file, assume it's binary to be safe
-			return true;
-		}
+		} /* c8 ignore next - file might be binary despite our check */ catch {}
+
+		/* c8 ignore next */
+		return true;
 	}
 
 	protected async fetchFromDirectory(): Promise<string> {
@@ -256,7 +256,7 @@ export abstract class McpTool {
 							await walk(full);
 						} else if (st.isFile()) {
 							// Skip files that are likely binary
-							const isBinary = await this.isBinaryFile(full, readFileSync);
+							const isBinary = await this.isBinaryFile(full);
 							if (!isBinary) {
 								files.push(full);
 							}

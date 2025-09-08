@@ -10,7 +10,6 @@ const chunkOptions = { maxChars: 1200, overlap: 200 };
 const spec: McpToolSpec = {
 	name: 'docs',
 	description: 'Angular docs context search tool.',
-	sourceId: 'angular-llm-context',
 	contextUrl,
 	chunkOptions,
 	schema: z.object({

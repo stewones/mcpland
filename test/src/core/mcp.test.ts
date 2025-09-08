@@ -150,10 +150,46 @@ describe('McpTool base class', () => {
 			}
 		};
 
+		// Mock the new fs methods used by isBinaryFile
+		const openSyncMock = vi.fn((path: string) => {
+			// Return a fake file descriptor
+			return 123;
+		});
+		const readSyncMock = vi.fn((fd: number, buffer: Buffer, offset: number, length: number, position: number) => {
+			// Simulate reading file content into buffer based on the current path being tested
+			// We need to track the path, so we'll use a closure to remember the last opened path
+			const mockPath = openSyncMock.mock.calls[openSyncMock.mock.calls.length - 1]?.[0] || '';
+			
+			if (fd === 123) { // Our fake fd
+				let content: Buffer;
+				if (/img\.png$/.test(mockPath)) {
+					content = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]); // PNG with null byte
+				} else if (/bin\.bin$/.test(mockPath)) {
+					content = Buffer.from([0x00, 0x01, 0x02, 0x03]); // Binary with null bytes
+				} else if (/a\.md$/.test(mockPath)) {
+					content = Buffer.from('Content A', 'utf-8');
+				} else if (/b\.txt$/.test(mockPath)) {
+					content = Buffer.from('Content B', 'utf-8');
+				} else {
+					content = Buffer.from('Default content', 'utf-8');
+				}
+				const bytesToCopy = Math.min(content.length, length);
+				content.copy(buffer, offset, 0, bytesToCopy);
+				return bytesToCopy;
+			}
+			return 0;
+		});
+		const closeSyncMock = vi.fn(() => {
+			// No-op for closing file descriptor
+		});
+
 		vi.doMock('node:fs', () => ({
 			readdirSync: readdirMock,
 			statSync: statMock,
 			readFileSync: readFileMock,
+			openSync: openSyncMock,
+			readSync: readSyncMock,
+			closeSync: closeSyncMock,
 		}));
 
 		vi.doMock('node:path', () => pathMock);

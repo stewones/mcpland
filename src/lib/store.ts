@@ -173,9 +173,9 @@ export class SqliteEmbedStore {
 				idx++;
 				continue; // Skip if chunk already exists
 			}
-			log.warn(`Embedding chunk ${idx}`);
+			log.warn(`[${mcpId}/${toolId}] Embedding chunk ${idx} of ${chunks.length}`);
 			const vector = await this.embedText(content);
-			log.warn(`Inserting chunk ${idx}`);
+			log.warn(`[${mcpId}/${toolId}] Inserting chunk ${idx} of ${chunks.length}`);
 			this.insertChunk(source.id, idx, content, String(hash), vector);
 			idx++;
 		}
